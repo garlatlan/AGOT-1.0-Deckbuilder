@@ -2,39 +2,23 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE E CSS "FORCE" ---
+# --- 1. CONFIGURAZIONE ---
 st.set_page_config(page_title="AGoT 1.0 Builder", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
-    
-    /* FIX RADICALE FRECCE E TITOLI EXPANDER */
-    /* 1. Forza il colore di base del testo e dell'icona */
-    [data-testid="stSidebar"] .st-expander {
-        border: 1px solid #444 !important;
-        background-color: #262730 !important;
-    }
-    
-    /* 2. Colora la freccia di giallo acceso o bianco per il massimo contrasto */
-    [data-testid="stSidebar"] svg[data-testid="stExpanderIcon"] {
-        fill: #fffd00 !important; /* Giallo acceso per essere sicuri di vederla */
-        color: #fffd00 !important;
-        width: 1.5rem !important;
-        height: 1.5rem !important;
-    }
-
-    /* 3. Evidenzia la barra del titolo al passaggio del mouse */
-    summary:hover {
-        background-color: #3e404b !important;
-        color: #fffd00 !important;
-    }
-
-    /* Riduzione spazi widget */
-    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
-    .num-label { margin-bottom: -15px; margin-top: 5px; display: block; font-weight: bold; color: #eee; }
-    
-    /* Stile pulsanti */
+    .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; }
+    
+    /* Box per separare visivamente le sezioni */
+    .filter-section {
+        background-color: #262730;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #444;
+        margin-bottom: 10px;
+    }
+    .num-label { margin-bottom: -15px; margin-top: 5px; display: block; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -56,7 +40,6 @@ def load_data():
                 if c: all_crests.add(c)
         return df, sorted(list(all_crests))
     except Exception as e:
-        st.error(f"Errore: {e}")
         return pd.DataFrame(), []
 
 df, available_crests = load_data()
@@ -66,18 +49,23 @@ if 'deck' not in st.session_state: st.session_state.deck = {}
 if 'preview' not in st.session_state and not df.empty: 
     st.session_state.preview = df.iloc[0].to_dict()
 
-# --- 4. SIDEBAR ---
+# --- 4. SIDEBAR (NUOVO SISTEMA SENZA EXPANDER) ---
 st.sidebar.title("🔍 FILTRI")
 
 if not df.empty:
-    with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
-        f_name = st.text_input("Nome...")
-        f_text = st.text_input("Testo...")
-        f_trait = st.text_input("Tratto...")
-        f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
-        f_type = st.selectbox("Tipo", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+    # --- SEZIONE 1: NOME E TIPO (Sempre Aperta) ---
+    st.sidebar.markdown("### 🆔 IDENTITÀ")
+    f_name = st.sidebar.text_input("Nome...")
+    f_text = st.sidebar.text_input("Testo...")
+    f_trait = st.sidebar.text_input("Tratto...")
+    f_house = st.sidebar.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
+    f_type = st.sidebar.selectbox("Tipo", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
+    st.sidebar.write("---")
+
+    # --- SEZIONE 2: STATISTICHE (Attivabile con Checkbox) ---
+    show_stats = st.sidebar.checkbox("📊 MOSTRA VALORI NUMERICI", value=False)
+    if show_stats:
         def num_filter_widget(label, key):
             st.markdown(f"<span class='num-label'>{label}</span>", unsafe_allow_html=True)
             cols = st.columns([0.2, 0.4, 0.4])
@@ -86,22 +74,33 @@ if not df.empty:
             val = cols[2].number_input("Val", 0, 15, key=f"v_{key}", label_visibility="collapsed")
             return active, op, val
 
-        cl, cr = st.columns(2)
+        cl, cr = st.sidebar.columns(2)
         with cl:
             a_cost, o_cost, v_cost = num_filter_widget("Costo", "c")
             a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
         with cr:
             a_str, o_str, v_str = num_filter_widget("Forza", "s")
             a_inf, o_inf, v_inf = num_filter_widget("Influ.", "f")
+    else:
+        # Valori di default se il menu è chiuso
+        a_cost = a_str = a_inc = a_inf = False
 
-    with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
-        st.write("**Icone**")
-        i_cols = st.columns(3)
+    st.sidebar.write("---")
+
+    # --- SEZIONE 3: ATTRIBUTI (Attivabile con Checkbox) ---
+    show_attrs = st.sidebar.checkbox("⚔️ MOSTRA ICONE E CRESTE", value=False)
+    if show_attrs:
+        st.sidebar.write("**Icone**")
+        i_cols = st.sidebar.columns(3)
         f_mil = i_cols[0].checkbox("MIL")
         f_int = i_cols[1].checkbox("INT")
         f_pow = i_cols[2].checkbox("POW")
-        st.write("**Creste**")
-        sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
+        
+        st.sidebar.write("**Creste**")
+        sel_crests = [c for c in available_crests if st.sidebar.checkbox(c, key=f"cr_{c}")]
+    else:
+        f_mil = f_int = f_pow = False
+        sel_crests = []
 
     # --- LOGICA FILTRO ---
     filtered = df.copy()
@@ -131,7 +130,7 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 5. LAYOUT ---
+# --- 5. LAYOUT RISULTATI ---
 c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
 
 with c_list:
@@ -145,8 +144,9 @@ with c_view:
     st.subheader("🖼️ Anteprima")
     p = st.session_state.get('preview')
     if p:
-        st.image(f"https://agot-lcg-search.pages.dev{p['full_image_url']}", use_container_width=True)
-        if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
+        img_url = f"https://agot-lcg-search.pages.dev{p['full_image_url']}"
+        st.image(img_url, use_container_width=True)
+        if st.button("➕ AGGIUNGI", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
             st.rerun()
         st.info(f"**Testo:** {p.get('rules_text', 'N/A')}")
