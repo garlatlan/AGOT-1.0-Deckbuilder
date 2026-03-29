@@ -11,16 +11,20 @@ st.markdown("""
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     
-    /* Riduzione drastica dello spazio tra i widget per compattare la riga */
+    /* Rimuove lo spazio eccessivo tra le righe di Streamlit */
     [data-testid="stVerticalBlock"] > div {
-        margin-top: -5px !important;
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
     
-    /* Rimuove il padding extra in fondo alle colonne */
+    /* Allineamento verticale elementi colonne */
     [data-testid="column"] { 
-        padding-bottom: 0px !important;
         display: flex; 
         align-items: center; 
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
 
     /* Layout icone e simboli */
@@ -30,12 +34,13 @@ st.markdown("""
     .icon-slot { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
     .crest-slot { height: 30px; display: flex; align-items: center; justify-content: start; gap: 4px; }
     
-    /* LINEA DI SEPARAZIONE: Margini identici sopra e sotto per simmetria perfetta */
+    /* LINEA DI SEPARAZIONE BILANCIATA */
+    /* Regola questi margini (es. 8px) per aumentare/diminuire lo spazio totale tra i record */
     hr { 
-        margin-top: 5px !important; 
-        margin-bottom: 5px !important; 
+        margin-top: 8px !important; 
+        margin-bottom: 8px !important; 
         border: 0; 
-        border-top: 1px solid rgba(255,255,255,0.2) !important; 
+        border-top: 1px solid rgba(255,255,255,0.15) !important; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -155,6 +160,7 @@ with c_list:
 
     with st.container(height=650):
         for i, row in filtered.head(100).iterrows():
+            # RIGA RECORD
             r = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
             
             if row['card_type'] not in ['House', 'Agenda', 'Plot']:
@@ -184,7 +190,7 @@ with c_list:
                 st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
                 st.rerun()
             
-            # LINEA DI SEPARAZIONE (CSS centralizzato sopra)
+            # LINEA DI SEPARAZIONE (Spaziatura simmetrica gestita via CSS hr)
             st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_view:
