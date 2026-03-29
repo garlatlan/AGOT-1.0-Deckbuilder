@@ -8,8 +8,10 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
-    .stButton>button { width: 100%; border-radius: 4px; }
+    .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
+    /* Allineamento verticale per la lista risultati */
+    .stButton { margin-top: 0px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -64,7 +66,7 @@ if not df.empty:
             a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
         with cr:
             a_str, o_str, v_str = num_filter_widget("Forza", "s")
-            a_inf, o_inf, v_inf = num_filter_widget("Influ.", "f")
+            a_inf, o_inf, v_inf = num_filter_widget("Influence", "f")
 
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
         st.write("**Icone**")
@@ -104,29 +106,28 @@ if not df.empty:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
 # --- 5. LAYOUT ---
-c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
+c_list, c_view, c_deck = st.columns([2.0, 1.3, 1.7]) # Leggermente allargata la lista
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
     with st.container(height=700):
         for i, row in filtered.head(100).iterrows():
-            if st.button(f"{row['name']} ({row['card_type']})", key=f"b{i}"):
+            col_res = st.columns([0.85, 0.15])
+            # Tasto Nome (Anteprima)
+            if col_res[0].button(f"{row['name']} ({row['card_type']})", key=f"b{i}", use_container_width=True):
                 st.session_state.preview = row.to_dict()
+            # Tasto Aggiungi (+)
+            if col_res[1].button("➕", key=f"add_{i}"):
+                st.session_state.deck[row['name']] = st.session_state.get('deck', {}).get(row['name'], 0) + 1
+                st.rerun()
 
 with c_view:
     st.subheader("🖼️ Anteprima")
     p = st.session_state.get('preview')
     if p:
         img_url = f"https://agot-lcg-search.pages.dev{p['preview_image_url']}"
-        
-        # Ridotto la dimensione per evitare sgranature
-        # width=250 forza la larghezza rendendola più nitida nella colonna
         st.image(img_url, width=280)
-        
-        if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
-            st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
-            st.rerun()
-        st.info(f"**Testo:** {p.get('rules_text', 'N/A')}")
+        # Rimosso il riquadro info blu come richiesto
     else:
         st.write("Seleziona una carta")
 
