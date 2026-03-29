@@ -2,23 +2,13 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE E CSS RADICALE ---
-st.set_page_config(page_title="AGoT 1.0 Deckbuilder", layout="wide")
+# --- 1. CONFIGURAZIONE ---
+st.set_page_config(page_title="AGoT 1.0 Builder", layout="wide")
 st.markdown("""
     <style>
-    /* Riduce i margini della sidebar al minimo */
-    [data-testid="stSidebar"] { min-width: 280px; max-width: 280px; }
-    [data-testid="stSidebarContent"] { padding: 0.5rem 0.5rem !important; }
-    
-    /* Forza gli elementi a stare vicini */
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0rem !important; }
-    
-    /* Rimpicciolisce font e checkbox */
-    .stCheckbox label p { font-size: 13px !important; margin: 0 !important; }
-    .stSelectbox label, .stTextInput label { display: none; } /* Nasconde le etichette per risparmiare spazio */
-    
-    /* Compattezza selettori numerici */
-    div[data-testid="stHorizontalBlock"] { margin-bottom: -10px; }
+    [data-testid="stSidebar"] { min-width: 320px; }
+    .stMarkdown, p, label { font-size: 14px !important; }
+    .stButton>button { width: 100%; border-radius: 4px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -41,50 +31,48 @@ def load_data():
 
 df, available_crests = load_data()
 
-# --- 3. SIDEBAR "ZERO-SCROLL" ---
-st.sidebar.write("### 🔍 FILTRI")
+# --- 3. SESSION STATE ---
+if 'deck' not in st.session_state: st.session_state.deck = {}
+if 'preview' not in st.session_state and not df.empty: 
+    st.session_state.preview = df.iloc[0].to_dict()
+
+# --- 4. SIDEBAR CON EXPANDER ---
+st.sidebar.title("🔍 FILTRI")
 
 if not df.empty:
-    # Nome, Testo, Tratto (Senza label sopra)
-    f_name = st.sidebar.text_input("N", placeholder="Nome carta...")
-    f_text = st.sidebar.text_input("T", placeholder="Testo effetto...")
-    
-    c_h, c_t = st.sidebar.columns(2)
-    f_house = c_h.selectbox("H", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
-    f_type = c_t.selectbox("T", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+    # --- GRUPPO 1: IDENTITÀ ---
+    with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
+        f_name = st.text_input("Cerca nome...")
+        f_text = st.text_input("Cerca testo...")
+        f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
+        f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    st.sidebar.write("---")
-    
-    # Funzione per riga numerica ultra-compatta
-    def row_num(label, key):
-        cols = st.sidebar.columns([0.15, 0.35, 0.25, 0.25])
-        active = cols[0].checkbox("", key=f"a_{key}")
-        cols[1].write(f"**{label}**")
-        op = cols[2].selectbox("", ["=", ">", "<"], key=f"o_{key}")
-        val = cols[3].selectbox("", list(range(11)), key=f"v_{key}")
-        return active, op, val
+    # --- GRUPPO 2: STATISTICHE ---
+    with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
+        def num_filter_widget(label, key):
+            c = st.columns([0.2, 0.4, 0.4])
+            active = c[0].checkbox("", key=f"a_{key}")
+            op = c[1].selectbox(label, ["=", ">", "<"], key=f"o_{key}", label_visibility="collapsed")
+            val = c[2].number_input(label, 0, 10, key=f"v_{key}", label_visibility="collapsed")
+            return active, op, val
 
-    a_cost, o_cost, v_cost = row_num("Cost", "c")
-    a_str, o_str, v_str = row_num("STR", "s")
-    a_inc, o_inc, v_inc = row_num("Inc", "i")
-    a_inf, o_inf, v_inf = row_num("Inf", "f")
+        st.write("**Costo | Forza**")
+        a_cost, o_cost, v_cost = num_filter_widget("Cost", "c")
+        a_str, o_str, v_str = num_filter_widget("STR", "s")
+        st.write("**Income | Influence**")
+        a_inc, o_inc, v_inc = num_filter_widget("Inc", "i")
+        a_inf, o_inf, v_inf = num_filter_widget("Inf", "f")
 
-    st.sidebar.write("---")
-    
-    # Icone su una riga
-    st.sidebar.write("**Icone**")
-    i_cols = st.sidebar.columns(3)
-    f_mil = i_cols[0].checkbox("MIL")
-    f_int = i_cols[1].checkbox("INT")
-    f_pow = i_cols[2].checkbox("POW")
-
-    # Creste su due colonne
-    st.sidebar.write("**Creste**")
-    sel_crests = []
-    cr_cols = st.sidebar.columns(2)
-    for idx, crest in enumerate(available_crests):
-        if cr_cols[idx % 2].checkbox(crest, key=f"cr_{crest}"):
-            sel_crests.append(crest)
+    # --- GRUPPO 3: ATTRIBUTI ---
+    with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
+        st.write("**Icone**")
+        i_cols = st.columns(3)
+        f_mil = i_cols[0].checkbox("MIL")
+        f_int = i_cols[1].checkbox("INT")
+        f_pow = i_cols[2].checkbox("POW")
+        
+        st.write("**Creste**")
+        sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
 
     # --- LOGICA FILTRO ---
     filtered = df.copy()
@@ -111,32 +99,34 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 4. LAYOUT RISULTATI ---
-c_list, c_view, c_deck = st.columns([1.8, 1.4, 1.8])
+# --- 5. LAYOUT RISULTATI ---
+c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
 
 with c_list:
     st.write(f"**Risultati ({len(filtered)})**")
-    with st.container(height=650):
-        for i, row in filtered.head(50).iterrows():
-            if st.button(f"{row['name']} ({row['card_type']})", key=f"b{i}", use_container_width=True):
+    with st.container(height=700):
+        for i, row in filtered.head(100).iterrows():
+            if st.button(f"{row['name']} ({row['card_type']})", key=f"b{i}"):
                 st.session_state.preview = row.to_dict()
 
 with c_view:
-    st.write("**Dettaglio**")
+    st.write("**Anteprima**")
     p = st.session_state.get('preview')
     if p:
         st.image(f"https://agot-lcg-search.pages.dev{p['full_image_url']}", use_container_width=True)
-        if st.button("➕ AGGIUNGI", use_container_width=True):
+        if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
             st.rerun()
 
 with c_deck:
-    st.write("**Mazzo**")
-    with st.container(height=500):
+    st.write("**Mazzo Attuale**")
+    with st.container(height=550):
         for n, q in st.session_state.get('deck', {}).items():
-            col_d = st.columns([0.8, 0.2])
+            col_d = st.columns([0.7, 0.3])
             col_d[0].write(f"**{n}** x{q}")
             if col_d[1].button("🗑️", key=f"rm_{n}"):
                 if q > 1: st.session_state.deck[n] -= 1
                 else: del st.session_state.deck[n]
                 st.rerun()
+    
+    st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json")
