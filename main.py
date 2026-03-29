@@ -19,8 +19,11 @@ st.markdown("""
     .icon-slot { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
     .crest-slot { height: 30px; display: flex; align-items: center; justify-content: start; gap: 4px; }
     
-    /* Riduzione padding righe per compensare l'aumento di dimensione icone */
+    /* Allineamento verticale elementi colonne */
     [data-testid="column"] { display: flex; align-items: center; }
+    
+    /* Separatore personalizzato */
+    hr { margin: 0.3rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,11 +53,9 @@ def load_data():
 df, available_crests = load_data()
 
 # --- 4. ICONE SVG (Asset Grafici Ingranditi) ---
-# Costo e Forza leggermente più grandi (32px / 36px)
 SVG_COIN = """<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
 SVG_SHIELD = """<svg viewBox="0 0 32 32" width="36" height="36"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
 
-# Icone Sfida e Creste uniformate a 24px
 ICON_SIZE = 24
 SVG_MIL = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>"""
 SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
@@ -68,7 +69,7 @@ CREST_ICONS = {
     "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
 }
 
-# --- 5. SIDEBAR FILTRI (Invariata) ---
+# --- 5. SIDEBAR FILTRI ---
 st.sidebar.title("🔍 FILTRI")
 if not df.empty:
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
@@ -103,6 +104,7 @@ if not df.empty:
         st.write("**Creste**")
         sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
 
+    # LOGICA FILTRI
     filtered = df.copy()
     if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
     if f_text: filtered = filtered[filtered['rules_text'].fillna("").str.contains(f_text, case=False)]
@@ -130,7 +132,6 @@ c_list, c_view, c_deck = st.columns([2.35, 1.05, 1.6])
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
-    # Allineamento testate colonne
     h = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
     h[0].write("$")
     h[1].write("Nome")
@@ -156,7 +157,7 @@ with c_list:
             if row['card_type'] == 'Character':
                 r[2].markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:15px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
             
-            # 4. ICONE (24px ciascuna)
+            # 4. ICONE (24px)
             icons_html = '<div style="display:flex; gap:3px;">'
             icons_html += f'<div class="icon-slot">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>'
             icons_html += f'<div class="icon-slot">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>'
@@ -164,7 +165,7 @@ with c_list:
             icons_html += '</div>'
             r[3].markdown(icons_html, unsafe_allow_html=True)
             
-            # 5. CRESTE (24px ciascuna)
+            # 5. CRESTE (24px)
             crest_html = '<div class="crest-slot">'
             if row['crest_list']:
                 for c_name in row['crest_list']:
@@ -176,6 +177,9 @@ with c_list:
             if r[5].button("➕", key=f"add_{row['id']}"):
                 st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
                 st.rerun()
+            
+            # LINEA DI SEPARAZIONE BIANCA
+            st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_view:
     st.subheader("🖼️ Anteprima")
