@@ -9,7 +9,7 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; }
-    /* Rimuove lo spazio eccessivo tra i widget nella sidebar */
+    /* Riduce lo spazio tra i widget nella sidebar per densità */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
     </style>
     """, unsafe_allow_html=True)
@@ -21,19 +21,19 @@ def load_data():
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
         
-        # Normalizzazione Casata
+        # Normalizzazione Casata (estrae la prima se lista)
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         
-        # Conversione Numerica (Cost, STR, Inc, Inf)
+        # Conversione Numerica sicura
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
         
-        # Liste per Icone e Creste (chiave 'crest' al singolare dal tuo JSON)
+        # Liste per Icone e Creste
         df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         
-        # Estrazione Creste Dinamiche
+        # Raccolta dinamica di tutte le creste presenti nel file
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
@@ -63,7 +63,7 @@ if not df.empty:
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
         f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    # --- GRUPPO 2: STATISTICHE (LAYOUT RICHIESTO) ---
+    # --- GRUPPO 2: STATISTICHE ---
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter_widget(label, key):
             st.write(f"**{label}**") # Titolo sopra ad ogni casella
@@ -95,7 +95,7 @@ if not df.empty:
         st.write("**Creste**")
         sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
 
-    # --- LOGICA FILTRO ---
+    # --- LOGICA APPLICAZIONE FILTRI ---
     filtered = df.copy()
     if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
     if f_text: filtered = filtered[filtered['rules_text'].fillna("").str.contains(f_text, case=False)]
@@ -123,7 +123,7 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 5. LAYOUT RISULTATI ---
+# --- 5. LAYOUT PRINCIPALE (3 COLONNE) ---
 c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
 
 with c_list:
@@ -142,14 +142,15 @@ with c_view:
         if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
             st.rerun()
-        st.info(f"**Testo:** {p.get('rules_text', 'N/A')}")
+        st.info(f"**Effetto:** {p.get('rules_text', 'N/A')}")
 
 with c_deck:
     st.subheader("📜 Mazzo")
     m_count, p_count = 0, 0
     with st.container(height=550):
-        for n, q in st.session_state.get('deck', {}).items():
+        for n, q in list(st.session_state.get('deck', {}).items()):
             card_data = df[df['name'] == n].iloc[0]
+            # Determina il tag per categoria
             tag = "P" if card_data['card_type'] == 'Plot' else ("S" if card_data['card_type'] in ['House', 'Agenda'] else "D")
             
             col_d = st.columns([0.7, 0.3])
@@ -164,4 +165,4 @@ with c_deck:
     
     st.divider()
     st.write(f"**Mazzo:** {m_count}/60 | **Plots:** {p_count}/7")
-    st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json")
+    st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json", use_container_width=True)
