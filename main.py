@@ -1,178 +1,130 @@
 import streamlit as st
 import json
 import pandas as pd
-from fpdf import FPDF
-import requests
-from io import BytesIO
 
-# --- 1. CONFIGURAZIONE ---
+# --- 1. CONFIGURAZIONE E STILE ---
 st.set_page_config(page_title="AGoT 1.0 Builder Pro", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1e1e26; color: white; min-width: 350px; }
     .stMarkdown, p, label { color: #fafafa !important; }
-    .stButton>button { background-color: #3e404b; color: white; border: 1px solid #555; }
+    .stButton>button { background-color: #3e404b; color: white; border: 1px solid #555; width: 100%; }
+    .card-box { border: 1px solid #444; border-radius: 5px; padding: 10px; margin-bottom: 5px; background: #262730; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOGICA IMMAGINI ---
-def get_valid_image_url(card_code):
-    if not card_code: return None
-    clean_code = str(card_code).lower().replace('__', '_').replace(' ', '_').strip()
-    return f"https://agot-lcg-search.pages.dev/images/cards/full/{clean_code}.webp"
-
-# --- 3. CARICAMENTO DATI (FIX CRESTS) ---
+# --- 2. CARICAMENTO DATI (Ottimizzato per il tuo JSON) ---
 @st.cache_data
 def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
-            df = pd.DataFrame(json.load(f))
+            data = json.load(f)
+        df = pd.DataFrame(data)
         
-        if df.empty: return df
-
-        # Colonne base
-        df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral") if 'house' in df.columns else "Neutral"
-        df['img_code'] = df['code'] if 'code' in df.columns else (df['id'] if 'id' in df.columns else df.index)
+        # Pulizia e Normalizzazione
+        df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         
-        # Pulizia numerica
+        # Gestione icone e creste come liste (per i filtri)
+        df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
+        df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
+        
+        # Conversione numeri
         for col in ['cost', 'strength', 'income', 'influence']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-            else:
-                df[col] = 0
-        
-        # FIX: Normalizzazione icone e creste (gestisce sia liste che stringhe singole)
-        def normalize_to_list(val):
-            if isinstance(val, list): return [str(i).strip() for i in val]
-            if pd.isna(val) or val == "" or val is None: return []
-            return [str(val).strip()]
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
-        df['icons_list'] = df['icons'].apply(normalize_to_list) if 'icons' in df.columns else [[]]*len(df)
-        df['crests_list'] = df['crests'].apply(normalize_to_list) if 'crests' in df.columns else [[]]*len(df)
-        df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x)).str.lower() if 'traits' in df.columns else ""
+        # Estrazione dinamica di tutte le creste presenti nel file
+        all_crests = set()
+        for sublist in df['crest_list']:
+            for c in sublist:
+                if c: all_crests.add(c)
         
-        return df
+        return df, sorted(list(all_crests))
     except Exception as e:
-        st.error(f"Errore: {e}")
-        return pd.DataFrame()
+        st.error(f"Errore nel caricamento del file: {e}")
+        return pd.DataFrame(), []
 
-df = load_data()
+df, available_crests = load_data()
 
-# --- 4. SESSION STATE ---
+# --- 3. SESSION STATE ---
 if 'deck' not in st.session_state: st.session_state.deck = {}
-if 'preview_card' not in st.session_state and not df.empty: 
-    st.session_state.preview_card = df.iloc[0].to_dict()
+if 'preview' not in st.session_state and not df.empty: 
+    st.session_state.preview = df.iloc[0].to_dict()
 
-# --- 5. SIDEBAR ---
+# --- 4. SIDEBAR (Filtri) ---
 st.sidebar.title("🔍 FILTRI")
 
 if not df.empty:
     f_name = st.sidebar.text_input("Nome Carta")
-    f_text = st.sidebar.text_input("Testo (Effetto)")
-    f_trait = st.sidebar.text_input("Trait (es. Knight)")
-
-    c_h, c_t = st.sidebar.columns(2)
-    f_house = c_h.selectbox("House", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
-    f_type = c_t.selectbox("Type", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
-
+    f_house = st.sidebar.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
+    f_type = st.sidebar.selectbox("Tipo", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+    
     st.sidebar.divider()
     
-    def optional_numeric_filter(label, key):
-        active = st.sidebar.checkbox(f"Filtra per {label}", key=f"active_{key}")
-        if active:
-            cols = st.sidebar.columns([0.4, 0.6])
-            op = cols[0].selectbox("Op", ["=", ">", "<", ">=", "<="], key=f"op_{key}")
-            val = cols[1].number_input("Valore", min_value=0, step=1, key=f"val_{key}")
-            return True, op, val
-        return False, None, None
-
-    active_cost, op_cost, v_cost = optional_numeric_filter("Cost", "cost")
-    active_str, op_str, v_str = optional_numeric_filter("Strength", "str")
-    active_inc, op_inc, v_inc = optional_numeric_filter("Income", "inc")
-    active_inf, op_inf, v_inf = optional_numeric_filter("Influence", "inf")
-
-    # Icone e Creste con sistema a Checkbox
-    st.sidebar.divider()
-    st.sidebar.write("**Icons**")
-    selected_icons = [icon for icon in ["Military", "Intrigue", "Power"] if st.sidebar.checkbox(icon)]
+    # Icone (Usando i nomi esatti del tuo JSON)
+    st.sidebar.write("**Icone**")
+    c_mil = st.sidebar.checkbox("Military")
+    c_int = st.sidebar.checkbox("Intrigue")
+    c_pow = st.sidebar.checkbox("Power")
     
-    st.sidebar.write("**Crests**")
-    # Shadows, Noble, Holy, Learned, War sono i nomi standard nel JSON
-    selected_crests = [crest for crest in ["Shadows", "Noble", "Holy", "Learned", "War"] if st.sidebar.checkbox(crest)]
+    # Creste (Generate automaticamente dal tuo JSON)
+    st.sidebar.divider()
+    st.sidebar.write("**Creste**")
+    selected_crests = []
+    for crest in available_crests:
+        if st.sidebar.checkbox(crest):
+            selected_crests.append(crest)
 
-    # --- APPLICAZIONE FILTRI ---
+    # --- LOGICA FILTRO ---
     filtered = df.copy()
-    if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
-    if f_text and 'rules_text' in filtered.columns: 
-        filtered = filtered[filtered['rules_text'].fillna("").str.contains(f_text, case=False)]
-    if f_trait: filtered = filtered[filtered['traits_str'].str.contains(f_trait.lower())]
-    if f_house != "Tutte": filtered = filtered[filtered['house_str'] == f_house]
-    if f_type != "Tutti": filtered = filtered[filtered['card_type'] == f_type]
-
-    def apply_op(df_in, col, active, op, val):
-        if not active or col not in df_in.columns: return df_in
-        if op == "=": return df_in[df_in[col] == val]
-        if op == ">": return df_in[df_in[col] > val]
-        if op == "<": return df_in[df_in[col] < val]
-        if op == ">=": return df_in[df_in[col] >= val]
-        if op == "<=": return df_in[df_in[col] <= val]
-        return df_in
-
-    filtered = apply_op(filtered, 'cost', active_cost, op_cost, v_cost)
-    filtered = apply_op(filtered, 'strength', active_str, op_str, v_str)
-    filtered = apply_op(filtered, 'income', active_inc, op_inc, v_inc)
-    filtered = apply_op(filtered, 'influence', active_inf, op_inf, v_inf)
-
-    # Filtro AND per icone
-    for icon in selected_icons:
-        filtered = filtered[filtered['icons_list'].apply(lambda x: icon in x)]
+    if f_name: 
+        filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
+    if f_house != "Tutte": 
+        filtered = filtered[filtered['house_str'] == f_house]
+    if f_type != "Tutti": 
+        filtered = filtered[filtered['card_type'] == f_type]
     
-    # Filtro AND per creste (Fix: verifica la presenza ignorando maiuscole/minuscole)
-    for crest in selected_crests:
-        filtered = filtered[filtered['crests_list'].apply(lambda x: any(crest.lower() == c.lower() for c in x))]
+    # Filtro Icone
+    if c_mil: filtered = filtered[filtered['icons_list'].apply(lambda x: "Military" in x)]
+    if c_int: filtered = filtered[filtered['icons_list'].apply(lambda x: "Intrigue" in x)]
+    if c_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
+    
+    # Filtro Creste
+    for c in selected_crests:
+        filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-    # --- 6. LAYOUT ---
-    c1, c2, c3 = st.columns([2, 1.5, 1.5])
+# --- 5. INTERFACCIA PRINCIPALE ---
+col_list, col_card, col_deck = st.columns([1.5, 1.2, 1.3])
 
-    with c1:
-        st.subheader(f"🗃️ Risultati ({len(filtered)})")
-        with st.container(height=700):
-            for i, row in filtered.head(100).iterrows():
-                cols = st.columns([0.8, 0.2])
-                if cols[0].button(f"{row['name']} ({row['card_type']})", key=f"b{i}"):
-                    st.session_state.preview_card = row.to_dict()
-                if cols[1].button("➕", key=f"a{i}"):
-                    st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
-                    st.rerun()
-
-    with c2:
-        st.subheader("🖼️ Anteprima")
-        p = st.session_state.preview_card
-        if p:
-            st.image(get_valid_image_url(p.get('img_code')), width=350)
-            st.info(f"**Testo:** {p.get('rules_text', 'N/A')}")
-
-    with c3:
-        st.subheader("📜 Mazzo")
-        m_count, p_count = 0, 0
-        for name, qty in list(st.session_state.deck.items()):
-            res = df[df['name'] == name]
-            if res.empty: continue
-            card = res.iloc[0]
-            tag = "P" if card['card_type'] == 'Plot' else ("S" if card['card_type'] in ['House', 'Agenda'] else "D")
-            
-            dm = st.columns([0.6, 0.2, 0.2])
-            dm[0].write(f"[{tag}] {name}")
-            dm[1].write(f"x{qty}")
-            if dm[2].button("🗑️", key=f"rm_{name}"):
-                if qty > 1: st.session_state.deck[name] -= 1
-                else: del st.session_state.deck[name]
+with col_list:
+    st.subheader(f"Carte ({len(filtered)})")
+    with st.container(height=600):
+        for i, row in filtered.iterrows():
+            cols = st.columns([0.8, 0.2])
+            if cols[0].button(f"{row['name']}", key=f"btn_{row['id']}"):
+                st.session_state.preview = row.to_dict()
+            if cols[1].button("➕", key=f"add_{row['id']}"):
+                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
                 st.rerun()
-            
-            if tag == "D": m_count += qty
-            elif tag == "P": p_count += qty
 
-        st.divider()
-        st.metric("Deck (60)", m_count, delta=m_count-60)
-        st.metric("Plots (7)", p_count, delta=p_count-7)
-        st.download_button("💾 Salva JSON", json.dumps(st.session_state.deck), "mazzo.json")
+with col_card:
+    st.subheader("Anteprima")
+    p = st.session_state.preview
+    if p:
+        # Costruisco l'URL immagine
+        img_url = f"https://agot-lcg-search.pages.dev{p['full_image_url']}"
+        st.image(img_url, use_container_width=True)
+        st.info(f"**Testo:**\n{p.get('rules_text', 'Nessun testo')}")
+
+with col_deck:
+    st.subheader("Mazzo")
+    for name, qty in list(st.session_state.deck.items()):
+        d_cols = st.columns([0.6, 0.2, 0.2])
+        d_cols[0].write(name)
+        d_cols[1].write(f"x{qty}")
+        if d_cols[2].button("🗑️", key=f"del_{name}"):
+            if qty > 1: st.session_state.deck[name] -= 1
+            else: del st.session_state.deck[name]
+            st.rerun()
+    
+    st.divider()
+    st.download_button("Esporta Mazzo", json.dumps(st.session_state.deck), "deck.json")
