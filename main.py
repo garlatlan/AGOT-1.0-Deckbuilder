@@ -24,8 +24,21 @@ def load_data():
     with open('agot1.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
     df = pd.DataFrame(data)
-    df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) else "Neutral")
-    df['is_restricted'] = df['legality_joust'] == "Restricted"
+    
+    # FIX: Gestione robusta per liste vuote o mancanti nel campo 'house'
+    def get_house(x):
+        if isinstance(x, list) and len(x) > 0:
+            return str(x[0])
+        return "Neutral"
+    
+    df['house_str'] = df['house'].apply(get_house)
+    
+    # Identificazione Restricted List (usa .get per evitare errori se la colonna manca)
+    if 'legality_joust' in df.columns:
+        df['is_restricted'] = df['legality_joust'] == "Restricted"
+    else:
+        df['is_restricted'] = False
+        
     df['cost'] = pd.to_numeric(df['cost'], errors='coerce').fillna(0).astype(int)
     return df
 
@@ -44,7 +57,7 @@ if uploaded_deck:
     try:
         st.session_state.deck = json.load(uploaded_deck)
         st.sidebar.success("Mazzo caricato!")
-    except:
+    except Exception:
         st.sidebar.error("Errore nel file.")
 
 if st.session_state.deck:
@@ -82,9 +95,79 @@ with col_list:
 with col_preview:
     p = st.session_state.preview_card
     st.subheader("Card Preview")
-    if p['is_restricted']: st.error("⚠️ CARTA RESTRICTED")
+    if p.get('is_restricted'): st.error("⚠️ CARTA RESTRICTED")
     st.image(f"{IMG_BASE_URL}{p['full_image_url']}", use_container_width=True)
     st.info(f"**Testo:** {p.get('rules_text', 'Nessuno')}")
+    
     if st.session_state.deck:
         deck_df = df[df['name'].isin(st.session_state.deck.keys())].copy()
-        deck_df['qty']
+        deck_df['qty'] = deck_df['name'].map(st.session_state.deck)
+        curve_df = deck_df[deck_df['card_type'].isin(['Character', 'Location', 'Event'])]
+        if not curve_df.empty:
+            fig = px.bar(curve_df, x='cost', y='qty', color='card_type', title="Curva Costi", barmode='group')
+            st.plotly_chart(fig, use_container_width=True)
+
+with col_deck:
+    st.subheader("Il Tuo Mazzo")
+    total_cards, plots, restricted_found = 0, 0, []
+    
+    if not st.session_state.deck:
+        st.info("Aggiungi carte.")
+    else:
+        for name, qty in list(st.session_state.deck.items()):
+            # Recupero info carta dal DF principale
+            matching_rows = df[df['name'] == name]
+            if matching_rows.empty: continue
+            c_info = matching_rows.iloc[0]
+            
+            if c_info.get('is_restricted'): restricted_found.append(name)
+            
+            d1, d2, d3 = st.columns([0.65, 0.15, 0.2])
+            card_display_name = f"**{name}**"
+            if c_info.get('is_restricted'):
+                d1.markdown(f":red[{card_display_name}]")
+            else:
+                d1.markdown(card_display_name)
+            
+            d2.write(f"x{qty}")
+            if d3.button("🗑️", key=f"del_{name}"):
+                if qty > 1: st.session_state.deck[name] -= 1
+                else: del st.session_state.deck[name]
+                st.rerun()
+            
+            if c_info['card_type'] == 'Plot':
+                plots += qty
+            else:
+                total_cards += qty
+
+        st.divider()
+        if len(restricted_found) > 1: st.error(f"❌ ILLEGALE: {', '.join(restricted_found)}")
+        m1, m2 = st.columns(2)
+        m1.metric("Carte Mazzo", f"{total_cards}/60", delta=total_cards-60)
+        m2.metric("Mazzo Plot", f"{plots}/7", delta=plots-7)
+
+        if st.button("🖨️ Genera PDF Proxy"):
+            with st.spinner("Creazione PDF..."):
+                pdf = FPDF()
+                pdf.set_auto_page_break(auto=False)
+                c_w, c_h, space = 63.0, 88.0, 0.5
+                m_x, m_y = (210-(c_w*3+space*2))/2, (297-(c_h*3+space*2))/2
+                all_imgs = []
+                for n, q in st.session_state.deck.items():
+                    rows = df[df['name'] == n]
+                    if not rows.empty:
+                        u = IMG_BASE_URL + rows.iloc[0]['full_image_url']
+                        all_imgs.extend([u] * q)
+                
+                for i in range(0, len(all_imgs), 9):
+                    pdf.add_page()
+                    for idx, url in enumerate(all_imgs[i:i+9]):
+                        x, y = m_x+(idx%3)*(c_w+space), m_y+(idx//3)*(c_h+space)
+                        try:
+                            r = requests.get(url, timeout=10)
+                            pdf.image(BytesIO(r.content), x=x, y=y, w=c_w, h=c_h)
+                        except Exception:
+                            pdf.rect(x, y, c_w, c_h)
+                
+                pdf_output = pdf.output(dest='S').encode('latin-1')
+                st.download_button("⬇️ Scarica PDF", pdf_output, "proxy_agot.pdf", "application/pdf")
