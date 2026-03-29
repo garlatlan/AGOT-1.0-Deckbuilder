@@ -11,19 +11,32 @@ st.markdown("""
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     
-    /* Layout icone e simboli ottimizzato per dimensioni maggiori */
+    /* Riduzione drastica dello spazio tra i widget per compattare la riga */
+    [data-testid="stVerticalBlock"] > div {
+        margin-top: -5px !important;
+    }
+    
+    /* Rimuove il padding extra in fondo alle colonne */
+    [data-testid="column"] { 
+        padding-bottom: 0px !important;
+        display: flex; 
+        align-items: center; 
+    }
+
+    /* Layout icone e simboli */
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
     
-    /* Slot icone e creste uniformati a 26px per dare respiro alle icone da 24px */
     .icon-slot { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
     .crest-slot { height: 30px; display: flex; align-items: center; justify-content: start; gap: 4px; }
     
-    /* Allineamento verticale elementi colonne */
-    [data-testid="column"] { display: flex; align-items: center; }
-    
-    /* Separatore personalizzato */
-    hr { margin: 0.3rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
+    /* LINEA DI SEPARAZIONE: Margini identici sopra e sotto per simmetria perfetta */
+    hr { 
+        margin-top: 5px !important; 
+        margin-bottom: 5px !important; 
+        border: 0; 
+        border-top: 1px solid rgba(255,255,255,0.2) !important; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,7 +65,7 @@ def load_data():
 
 df, available_crests = load_data()
 
-# --- 4. ICONE SVG (Asset Grafici Ingranditi) ---
+# --- 4. ICONE SVG ---
 SVG_COIN = """<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
 SVG_SHIELD = """<svg viewBox="0 0 32 32" width="36" height="36"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
 
@@ -104,7 +117,6 @@ if not df.empty:
         st.write("**Creste**")
         sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
 
-    # LOGICA FILTRI
     filtered = df.copy()
     if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
     if f_text: filtered = filtered[filtered['rules_text'].fillna("").str.contains(f_text, case=False)]
@@ -145,19 +157,15 @@ with c_list:
         for i, row in filtered.head(100).iterrows():
             r = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
             
-            # 1. COSTO (32px)
             if row['card_type'] not in ['House', 'Agenda', 'Plot']:
                 r[0].markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
             
-            # 2. NOME
             if r[1].button(row['name'], key=f"p_{row['id']}", use_container_width=True):
                 st.session_state.preview = row.to_dict()
             
-            # 3. FORZA (36px)
             if row['card_type'] == 'Character':
                 r[2].markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:15px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
             
-            # 4. ICONE (24px)
             icons_html = '<div style="display:flex; gap:3px;">'
             icons_html += f'<div class="icon-slot">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>'
             icons_html += f'<div class="icon-slot">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>'
@@ -165,7 +173,6 @@ with c_list:
             icons_html += '</div>'
             r[3].markdown(icons_html, unsafe_allow_html=True)
             
-            # 5. CRESTE (24px)
             crest_html = '<div class="crest-slot">'
             if row['crest_list']:
                 for c_name in row['crest_list']:
@@ -173,12 +180,11 @@ with c_list:
             crest_html += '</div>'
             r[4].markdown(crest_html, unsafe_allow_html=True)
             
-            # 6. AGGIUNGI
             if r[5].button("➕", key=f"add_{row['id']}"):
                 st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
                 st.rerun()
             
-            # LINEA DI SEPARAZIONE BIANCA
+            # LINEA DI SEPARAZIONE (CSS centralizzato sopra)
             st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_view:
