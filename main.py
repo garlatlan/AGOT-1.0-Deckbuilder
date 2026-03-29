@@ -23,7 +23,7 @@ st.markdown("""
     /* Separatore sottile bianco */
     hr { margin: 0.5rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
 
-    /* LOGICA MOUSEOVER PER ANTEPRIMA */
+    /* LOGICA MOUSEOVER PER ANTEPRIMA (SPOSTATA A SINISTRA SOPRA I FILTRI) */
     .card-hover-container {
         position: relative;
         display: inline-block;
@@ -33,13 +33,13 @@ st.markdown("""
     .card-hover-image {
         display: none;
         position: fixed;
-        left: 350px; /* Appare a destra della sidebar */
-        top: 100px;
+        left: 20px; /* Posizionata sopra la sidebar dei filtri */
+        top: 80px;
         z-index: 9999;
         border: 2px solid #444;
         border-radius: 12px;
-        box-shadow: 10px 10px 30px rgba(0,0,0,0.8);
-        pointer-events: none; /* Evita che l'immagine stessa intercetti il mouse */
+        box-shadow: 10px 10px 40px rgba(0,0,0,0.9);
+        pointer-events: none;
     }
     .card-hover-container:hover .card-hover-image {
         display: block;
@@ -86,7 +86,7 @@ SVG_SHIELD = """<svg viewBox="0 0 32 32" width="36" height="36"><path d="M16 2 L
 
 ICON_SIZE = 24
 SVG_MIL = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>"""
-SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
+SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
 SVG_POW = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,16L3,5L8.5,10L12,4L15.5,10L21,5L19,16H5M19,19A1,1 0 0,1 18,20H6A1,1 0 0,1 5,19V18H19V19Z" fill="#00008b"/></svg>"""
 
 CREST_ICONS = {
@@ -154,21 +154,21 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. LAYOUT PRINCIPALE ---
+# --- 6. LAYOUT PRINCIPALE (A DUE COLONNE) ---
 c_list, c_deck = st.columns([3.4, 1.6])
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
     h = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
     h[0].write("$")
-    h[1].write("Nome (Passa il mouse per anteprima)")
+    h[1].write("Nome (Hover per anteprima)")
     h[2].write("Str")
     h[3].write("Icone")
     h[4].write("Cr")
     h[5].write("Add")
     st.divider()
 
-    with st.container(height=700):
+    with st.container(height=720):
         for i, row in filtered.head(100).iterrows():
             r = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
             
@@ -176,12 +176,12 @@ with c_list:
             if row['card_type'] not in ['House', 'Agenda', 'Plot']:
                 r[0].markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
             
-            # 2. NOME CON HOVER
+            # 2. NOME CON HOVER (A SINISTRA)
             img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
             hover_html = f"""
             <div class="card-hover-container">
                 <span class="card-name-text">{row['name']}</span>
-                <img class="card-hover-image" src="{img_hover_url}" width="280">
+                <img class="card-hover-image" src="{img_hover_url}" width="300">
             </div>
             """
             r[1].markdown(hover_html, unsafe_allow_html=True)
@@ -216,7 +216,7 @@ with c_list:
 with c_deck:
     st.subheader("📜 Mazzo")
     m_count, p_count = 0, 0
-    with st.container(height=600):
+    with st.container(height=620):
         for n, q in list(st.session_state.deck.items()):
             card_data = df[df['name'] == n].iloc[0]
             tag = "P" if card_data['card_type'] == 'Plot' else ("S" if card_data['card_type'] in ['House', 'Agenda'] else "D")
