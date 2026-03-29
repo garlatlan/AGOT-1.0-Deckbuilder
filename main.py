@@ -2,15 +2,31 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE ---
+# --- 1. CONFIGURAZIONE E FIX ESTETICI ---
 st.set_page_config(page_title="AGoT 1.0 Builder", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; }
-    /* Rimuove lo spazio eccessivo tra i widget nella sidebar */
+    
+    /* FIX FRECCE EXPANDER: Forza il colore bianco e aumenta visibilità */
+    [data-testid="stSidebar"] svg[data-testid="stExpanderIcon"] {
+        color: white !important;
+        fill: white !important;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+    
+    /* Migliora il contrasto del titolo dell'expander */
+    [data-testid="stExpanderDetails"] { border-top: 1px solid #444; }
+    summary { font-weight: bold; color: #fff !important; }
+
+    /* Riduce lo spazio tra i widget */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
+    
+    /* Spaziatura specifica per i titoli dei filtri numerici */
+    .num-label { margin-bottom: -15px; margin-top: 5px; display: block; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -21,19 +37,15 @@ def load_data():
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
         
-        # Normalizzazione Casata
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         
-        # Conversione Numerica (Cost, STR, Inc, Inf)
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
         
-        # Liste per Icone e Creste (chiave 'crest' al singolare dal tuo JSON)
         df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         
-        # Estrazione Creste Dinamiche
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
@@ -59,14 +71,14 @@ if not df.empty:
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
         f_name = st.text_input("Cerca nome...")
         f_text = st.text_input("Cerca testo...")
-        f_trait = st.text_input("Cerca Tratto (es. Knight)...")
+        f_trait = st.text_input("Cerca Tratto...")
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
         f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    # --- GRUPPO 2: STATISTICHE (LAYOUT RICHIESTO) ---
+    # --- GRUPPO 2: STATISTICHE ---
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter_widget(label, key):
-            st.write(f"**{label}**") # Titolo sopra ad ogni casella
+            st.markdown(f"<span class='num-label'>**{label}**</span>", unsafe_allow_html=True)
             cols = st.columns([0.2, 0.4, 0.4])
             active = cols[0].checkbox("", key=f"a_{key}")
             op = cols[1].selectbox("Op", ["=", ">", "<", ">=", "<="], key=f"o_{key}", label_visibility="collapsed")
@@ -76,12 +88,10 @@ if not df.empty:
         col_left, col_right = st.columns(2)
         with col_left:
             a_cost, o_cost, v_cost = num_filter_widget("Costo", "c")
-            st.write("") 
             a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
             
         with col_right:
             a_str, o_str, v_str = num_filter_widget("Forza", "s")
-            st.write("")
             a_inf, o_inf, v_inf = num_filter_widget("Influence", "f")
 
     # --- GRUPPO 3: ATTRIBUTI ---
@@ -151,14 +161,12 @@ with c_deck:
         for n, q in st.session_state.get('deck', {}).items():
             card_data = df[df['name'] == n].iloc[0]
             tag = "P" if card_data['card_type'] == 'Plot' else ("S" if card_data['card_type'] in ['House', 'Agenda'] else "D")
-            
             col_d = st.columns([0.7, 0.3])
             col_d[0].write(f"**[{tag}] {n}** x{q}")
             if col_d[1].button("🗑️", key=f"rm_{n}"):
                 if q > 1: st.session_state.deck[n] -= 1
                 else: del st.session_state.deck[n]
                 st.rerun()
-            
             if tag == "D": m_count += q
             elif tag == "P": p_count += q
     
