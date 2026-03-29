@@ -21,7 +21,7 @@ def get_valid_image_url(card_code):
     clean_code = str(card_code).lower().replace('__', '_').replace(' ', '_').strip()
     return f"https://agot-lcg-search.pages.dev/images/cards/full/{clean_code}.webp"
 
-# --- 3. CARICAMENTO DATI ---
+# --- 3. CARICAMENTO DATI (FIX CRESTS) ---
 @st.cache_data
 def load_data():
     try:
@@ -41,9 +41,14 @@ def load_data():
             else:
                 df[col] = 0
         
-        # Liste per filtri
-        df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else []) if 'icons' in df.columns else [[]]*len(df)
-        df['crests_list'] = df['crests'].apply(lambda x: x if isinstance(x, list) else []) if 'crests' in df.columns else [[]]*len(df)
+        # FIX: Normalizzazione icone e creste (gestisce sia liste che stringhe singole)
+        def normalize_to_list(val):
+            if isinstance(val, list): return [str(i).strip() for i in val]
+            if pd.isna(val) or val == "" or val is None: return []
+            return [str(val).strip()]
+
+        df['icons_list'] = df['icons'].apply(normalize_to_list) if 'icons' in df.columns else [[]]*len(df)
+        df['crests_list'] = df['crests'].apply(normalize_to_list) if 'crests' in df.columns else [[]]*len(df)
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x)).str.lower() if 'traits' in df.columns else ""
         
         return df
@@ -72,7 +77,6 @@ if not df.empty:
 
     st.sidebar.divider()
     
-    # Funzione UI per filtri opzionali
     def optional_numeric_filter(label, key):
         active = st.sidebar.checkbox(f"Filtra per {label}", key=f"active_{key}")
         if active:
@@ -87,9 +91,13 @@ if not df.empty:
     active_inc, op_inc, v_inc = optional_numeric_filter("Income", "inc")
     active_inf, op_inf, v_inf = optional_numeric_filter("Influence", "inf")
 
-    # Icone e Creste
+    # Icone e Creste con sistema a Checkbox
     st.sidebar.divider()
+    st.sidebar.write("**Icons**")
     selected_icons = [icon for icon in ["Military", "Intrigue", "Power"] if st.sidebar.checkbox(icon)]
+    
+    st.sidebar.write("**Crests**")
+    # Shadows, Noble, Holy, Learned, War sono i nomi standard nel JSON
     selected_crests = [crest for crest in ["Shadows", "Noble", "Holy", "Learned", "War"] if st.sidebar.checkbox(crest)]
 
     # --- APPLICAZIONE FILTRI ---
@@ -115,10 +123,13 @@ if not df.empty:
     filtered = apply_op(filtered, 'income', active_inc, op_inc, v_inc)
     filtered = apply_op(filtered, 'influence', active_inf, op_inf, v_inf)
 
+    # Filtro AND per icone
     for icon in selected_icons:
         filtered = filtered[filtered['icons_list'].apply(lambda x: icon in x)]
+    
+    # Filtro AND per creste (Fix: verifica la presenza ignorando maiuscole/minuscole)
     for crest in selected_crests:
-        filtered = filtered[filtered['crests_list'].apply(lambda x: crest in x)]
+        filtered = filtered[filtered['crests_list'].apply(lambda x: any(crest.lower() == c.lower() for c in x))]
 
     # --- 6. LAYOUT ---
     c1, c2, c3 = st.columns([2, 1.5, 1.5])
@@ -164,4 +175,4 @@ if not df.empty:
         st.divider()
         st.metric("Deck (60)", m_count, delta=m_count-60)
         st.metric("Plots (7)", p_count, delta=p_count-7)
-        st.download_button("💾 Esporta JSON", json.dumps(st.session_state.deck), "mazzo.json")
+        st.download_button("💾 Salva JSON", json.dumps(st.session_state.deck), "mazzo.json")
