@@ -7,21 +7,21 @@ st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { min-width: 320px; z-index: 1; } /* Abbassiamo leggermente la priorità della sidebar */
+    [data-testid="stSidebar"] { min-width: 320px; z-index: 1; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     
     /* Layout icone e simboli */
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
-    .icon-slot { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+    .icon-slot { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
     .crest-slot { height: 30px; display: flex; align-items: center; justify-content: start; gap: 4px; }
     
     /* Allineamento verticale elementi colonne */
     [data-testid="column"] { display: flex; align-items: center; }
     
     /* Separatore sottile bianco */
-    hr { margin: 0.5rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
+    hr { margin: 0.4rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
 
     /* LOGICA MOUSEOVER - FIX PRIMO PIANO */
     .card-hover-container {
@@ -33,14 +33,14 @@ st.markdown("""
     .card-hover-image {
         display: none;
         position: fixed;
-        left: 30px; /* Sopra la sidebar */
+        left: 30px;
         top: 50px;
-        z-index: 999999 !important; /* Valore estremo per stare sopra la sidebar */
+        z-index: 999999 !important;
         border: 3px solid #1E90FF;
         border-radius: 15px;
         box-shadow: 0px 0px 50px rgba(0,0,0,1);
         pointer-events: none;
-        background-color: #000; /* Evita trasparenze fastidiose mentre carica */
+        background-color: #000;
     }
     .card-hover-container:hover .card-hover-image {
         display: block;
@@ -49,6 +49,10 @@ st.markdown("""
         color: #1E90FF;
         font-weight: bold;
         text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -78,10 +82,10 @@ def load_data():
 df, available_crests = load_data()
 
 # --- 4. ICONE SVG ---
-SVG_COIN = """<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
-SVG_SHIELD = """<svg viewBox="0 0 32 32" width="36" height="36"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
+SVG_COIN = """<svg viewBox="0 0 32 32" width="28" height="28"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
+SVG_SHIELD = """<svg viewBox="0 0 32 32" width="32" height="32"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
 
-ICON_SIZE = 24
+ICON_SIZE = 22
 SVG_MIL = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>"""
 SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
 SVG_POW = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,16L3,5L8.5,10L12,4L15.5,10L21,5L19,16H5M19,19A1,1 0 0,1 18,20H6A1,1 0 0,1 5,19V18H19V19Z" fill="#00008b"/></svg>"""
@@ -151,62 +155,58 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. LAYOUT PRINCIPALE ---
-c_list, c_deck = st.columns([3.4, 1.6])
+# --- 6. LAYOUT PRINCIPALE (EQUILIBRATO 50/50) ---
+c_list, c_deck = st.columns([2.6, 2.4])
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
-    h = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
+    h = st.columns([0.15, 0.4, 0.15, 0.15, 0.15])
     h[0].write("$")
-    h[1].write("Nome (Passa il mouse)")
+    h[1].write("Nome")
     h[2].write("Str")
     h[3].write("Icone")
-    h[4].write("Cr")
-    h[5].write("Add")
+    h[4].write("Add")
     st.divider()
 
     with st.container(height=720):
         for i, row in filtered.head(100).iterrows():
-            r = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
+            r = st.columns([0.15, 0.4, 0.15, 0.15, 0.15])
             
             # 1. COSTO
-            if row['card_type'] not in ['House', 'Agenda', 'Plot']:
-                r[0].markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
+            with r[0]:
+                if row['card_type'] not in ['House', 'Agenda', 'Plot']:
+                    st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:14px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
             
-            # 2. NOME CON HOVER DINAMICO
-            img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
-            hover_html = f"""
-            <div class="card-hover-container">
-                <span class="card-name-text">{row['name']}</span>
-                <img class="card-hover-image" src="{img_hover_url}" width="320">
-            </div>
-            """
-            r[1].markdown(hover_html, unsafe_allow_html=True)
+            # 2. NOME CON HOVER
+            with r[1]:
+                img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
+                hover_html = f"""
+                <div class="card-hover-container">
+                    <span class="card-name-text">{row['name']}</span>
+                    <img class="card-hover-image" src="{img_hover_url}" width="300">
+                </div>
+                """
+                st.markdown(hover_html, unsafe_allow_html=True)
             
             # 3. FORZA
-            if row['card_type'] == 'Character':
-                r[2].markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:15px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
+            with r[2]:
+                if row['card_type'] == 'Character':
+                    st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:14px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
             
             # 4. ICONE
-            icons_html = '<div style="display:flex; gap:3px;">'
-            icons_html += f'<div class="icon-slot">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>'
-            icons_html += f'<div class="icon-slot">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>'
-            icons_html += f'<div class="icon-slot">{SVG_POW if "Power" in row["icons_list"] else ""}</div>'
-            icons_html += '</div>'
-            r[3].markdown(icons_html, unsafe_allow_html=True)
+            with r[3]:
+                icons_html = '<div style="display:flex; gap:2px; justify-content:center;">'
+                if "Military" in row["icons_list"]: icons_html += SVG_MIL
+                if "Intrigue" in row["icons_list"]: icons_html += SVG_INT
+                if "Power" in row["icons_list"]: icons_html += SVG_POW
+                icons_html += '</div>'
+                st.markdown(icons_html, unsafe_allow_html=True)
             
-            # 5. CRESTE
-            crest_html = '<div class="crest-slot">'
-            if row['crest_list']:
-                for c_name in row['crest_list']:
-                    crest_html += CREST_ICONS.get(c_name, f'<span style="font-size:10px;">{c_name}</span>')
-            crest_html += '</div>'
-            r[4].markdown(crest_html, unsafe_allow_html=True)
-            
-            # 6. AGGIUNGI
-            if r[5].button("➕", key=f"add_{row['id']}"):
-                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
-                st.rerun()
+            # 5. AGGIUNGI
+            with r[4]:
+                if st.button("➕", key=f"add_{row['id']}"):
+                    st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
+                    st.rerun()
             
             st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -214,17 +214,25 @@ with c_deck:
     st.subheader("📜 Mazzo")
     m_count, p_count = 0, 0
     with st.container(height=620):
-        for n, q in list(st.session_state.deck.items()):
+        # Ordiniamo il mazzo per tipo di carta per chiarezza
+        deck_items = []
+        for n, q in st.session_state.deck.items():
             card_data = df[df['name'] == n].iloc[0]
             tag = "P" if card_data['card_type'] == 'Plot' else ("S" if card_data['card_type'] in ['House', 'Agenda'] else "D")
-            cd = st.columns([0.7, 0.3])
-            cd[0].write(f"**[{tag}] {n}** x{q}")
-            if cd[1].button("🗑️", key=f"rm_{n}"):
-                if q > 1: st.session_state.deck[n] -= 1
-                else: del st.session_state.deck[n]
+            deck_items.append({'name': n, 'qty': q, 'tag': tag})
+        
+        for item in sorted(deck_items, key=lambda x: x['tag']):
+            cd = st.columns([0.8, 0.2])
+            cd[0].write(f"**[{item['tag']}] {item['name']}** x{item['qty']}")
+            if cd[1].button("🗑️", key=f"rm_{item['name']}"):
+                if item['qty'] > 1: st.session_state.deck[item['name']] -= 1
+                else: del st.session_state.deck[item['name']]
                 st.rerun()
-            if tag == "D": m_count += q
-            elif tag == "P": p_count += q
+            if item['tag'] == "D": m_count += item['qty']
+            elif item['tag'] == "P": p_count += item['qty']
+            
     st.divider()
-    st.write(f"**Mazzo:** {m_count}/60 | **Plots:** {p_count}/7")
-    st.download_button("💾 SALVA JSON", json.dumps(st.session_state.deck), "mazzo.json", use_container_width=True)
+    col_stat1, col_stat2 = st.columns(2)
+    col_stat1.metric("Mazzo (Draw)", f"{m_count}/60")
+    col_stat2.metric("Plots", f"{p_count}/7")
+    st.download_button("💾 ESPORTA MAZZO (JSON)", json.dumps(st.session_state.deck), "mazzo.json", use_container_width=True)
