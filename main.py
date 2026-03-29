@@ -9,9 +9,17 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
-    .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     
-    /* Rimuove lo spazio eccessivo tra le righe di Streamlit */
+    /* Forza l'altezza della riga del bottone per allinearla alle icone */
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 4px; 
+        padding: 0px 5px !important; 
+        height: 32px !important;
+        line-height: 32px !important;
+    }
+    
+    /* Reset totale dei margini di Streamlit nella lista risultati */
     [data-testid="stVerticalBlock"] > div {
         margin-top: 0px !important;
         margin-bottom: 0px !important;
@@ -19,26 +27,24 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
     
-    /* Allineamento verticale elementi colonne */
+    /* Centratura verticale perfetta del contenuto delle colonne */
     [data-testid="column"] { 
         display: flex; 
         align-items: center; 
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
+        justify-content: center;
+        padding: 0px !important;
     }
 
-    /* Layout icone e simboli */
-    .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
+    /* Contenitori icone */
+    .svg-container { display: flex; align-items: center; justify-content: center; position: relative; height: 36px; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
-    
     .icon-slot { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
-    .crest-slot { height: 30px; display: flex; align-items: center; justify-content: start; gap: 4px; }
+    .crest-slot { height: 32px; display: flex; align-items: center; justify-content: start; gap: 4px; }
     
-    /* LINEA DI SEPARAZIONE BILANCIATA */
-    /* Regola questi margini (es. 8px) per aumentare/diminuire lo spazio totale tra i record */
+    /* LINEA DI SEPARAZIONE: Spazio identico sopra e sotto */
     hr { 
-        margin-top: 8px !important; 
-        margin-bottom: 8px !important; 
+        margin-top: 10px !important; 
+        margin-bottom: 10px !important; 
         border: 0; 
         border-top: 1px solid rgba(255,255,255,0.15) !important; 
     }
@@ -163,34 +169,40 @@ with c_list:
             # RIGA RECORD
             r = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
             
-            if row['card_type'] not in ['House', 'Agenda', 'Plot']:
-                r[0].markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
+            with r[0]:
+                if row['card_type'] not in ['House', 'Agenda', 'Plot']:
+                    st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:6px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
             
-            if r[1].button(row['name'], key=f"p_{row['id']}", use_container_width=True):
-                st.session_state.preview = row.to_dict()
+            with r[1]:
+                if st.button(row['name'], key=f"p_{row['id']}", use_container_width=True):
+                    st.session_state.preview = row.to_dict()
             
-            if row['card_type'] == 'Character':
-                r[2].markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:15px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
+            with r[2]:
+                if row['card_type'] == 'Character':
+                    st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:8px; font-size:15px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
             
-            icons_html = '<div style="display:flex; gap:3px;">'
-            icons_html += f'<div class="icon-slot">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>'
-            icons_html += f'<div class="icon-slot">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>'
-            icons_html += f'<div class="icon-slot">{SVG_POW if "Power" in row["icons_list"] else ""}</div>'
-            icons_html += '</div>'
-            r[3].markdown(icons_html, unsafe_allow_html=True)
+            with r[3]:
+                icons_html = '<div style="display:flex; gap:3px; align-items:center; justify-content:center;">'
+                icons_html += f'<div class="icon-slot">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>'
+                icons_html += f'<div class="icon-slot">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>'
+                icons_html += f'<div class="icon-slot">{SVG_POW if "Power" in row["icons_list"] else ""}</div>'
+                icons_html += '</div>'
+                st.markdown(icons_html, unsafe_allow_html=True)
             
-            crest_html = '<div class="crest-slot">'
-            if row['crest_list']:
-                for c_name in row['crest_list']:
-                    crest_html += CREST_ICONS.get(c_name, f'<span style="font-size:10px;">{c_name}</span>')
-            crest_html += '</div>'
-            r[4].markdown(crest_html, unsafe_allow_html=True)
+            with r[4]:
+                crest_html = '<div class="crest-slot" style="justify-content:center;">'
+                if row['crest_list']:
+                    for c_name in row['crest_list']:
+                        crest_html += CREST_ICONS.get(c_name, f'<span style="font-size:10px;">{c_name}</span>')
+                crest_html += '</div>'
+                st.markdown(crest_html, unsafe_allow_html=True)
             
-            if r[5].button("➕", key=f"add_{row['id']}"):
-                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
-                st.rerun()
+            with r[5]:
+                if st.button("➕", key=f"add_{row['id']}"):
+                    st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
+                    st.rerun()
             
-            # LINEA DI SEPARAZIONE (Spaziatura simmetrica gestita via CSS hr)
+            # LINEA DI SEPARAZIONE (Simmetria gestita dal CSS 'hr')
             st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_view:
