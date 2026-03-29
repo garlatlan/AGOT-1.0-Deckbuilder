@@ -7,7 +7,7 @@ st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { min-width: 320px; }
+    [data-testid="stSidebar"] { min-width: 320px; z-index: 1; } /* Abbassiamo leggermente la priorità della sidebar */
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
     
@@ -23,7 +23,7 @@ st.markdown("""
     /* Separatore sottile bianco */
     hr { margin: 0.5rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.2) !important; }
 
-    /* LOGICA MOUSEOVER PER ANTEPRIMA (SPOSTATA A SINISTRA SOPRA I FILTRI) */
+    /* LOGICA MOUSEOVER - FIX PRIMO PIANO */
     .card-hover-container {
         position: relative;
         display: inline-block;
@@ -33,13 +33,14 @@ st.markdown("""
     .card-hover-image {
         display: none;
         position: fixed;
-        left: 20px; /* Posizionata sopra la sidebar dei filtri */
-        top: 80px;
-        z-index: 9999;
-        border: 2px solid #444;
-        border-radius: 12px;
-        box-shadow: 10px 10px 40px rgba(0,0,0,0.9);
+        left: 30px; /* Sopra la sidebar */
+        top: 50px;
+        z-index: 999999 !important; /* Valore estremo per stare sopra la sidebar */
+        border: 3px solid #1E90FF;
+        border-radius: 15px;
+        box-shadow: 0px 0px 50px rgba(0,0,0,1);
         pointer-events: none;
+        background-color: #000; /* Evita trasparenze fastidiose mentre carica */
     }
     .card-hover-container:hover .card-hover-image {
         display: block;
@@ -48,10 +49,6 @@ st.markdown("""
         color: #1E90FF;
         font-weight: bold;
         text-decoration: none;
-    }
-    .card-name-text:hover {
-        color: #00BFFF;
-        text-decoration: underline;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -154,14 +151,14 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. LAYOUT PRINCIPALE (A DUE COLONNE) ---
+# --- 6. LAYOUT PRINCIPALE ---
 c_list, c_deck = st.columns([3.4, 1.6])
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
     h = st.columns([0.1, 0.44, 0.1, 0.16, 0.12, 0.08])
     h[0].write("$")
-    h[1].write("Nome (Hover per anteprima)")
+    h[1].write("Nome (Passa il mouse)")
     h[2].write("Str")
     h[3].write("Icone")
     h[4].write("Cr")
@@ -176,12 +173,12 @@ with c_list:
             if row['card_type'] not in ['House', 'Agenda', 'Plot']:
                 r[0].markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:15px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
             
-            # 2. NOME CON HOVER (A SINISTRA)
+            # 2. NOME CON HOVER DINAMICO
             img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
             hover_html = f"""
             <div class="card-hover-container">
                 <span class="card-name-text">{row['name']}</span>
-                <img class="card-hover-image" src="{img_hover_url}" width="300">
+                <img class="card-hover-image" src="{img_hover_url}" width="320">
             </div>
             """
             r[1].markdown(hover_html, unsafe_allow_html=True)
