@@ -2,31 +2,39 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE E FIX ESTETICI ---
+# --- 1. CONFIGURAZIONE E CSS "FORCE" ---
 st.set_page_config(page_title="AGoT 1.0 Builder", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
-    .stMarkdown, p, label { font-size: 14px !important; }
-    .stButton>button { width: 100%; border-radius: 4px; }
     
-    /* FIX FRECCE EXPANDER: Forza il colore bianco e aumenta visibilità */
-    [data-testid="stSidebar"] svg[data-testid="stExpanderIcon"] {
-        color: white !important;
-        fill: white !important;
-        width: 1.25rem;
-        height: 1.25rem;
+    /* FIX RADICALE FRECCE E TITOLI EXPANDER */
+    /* 1. Forza il colore di base del testo e dell'icona */
+    [data-testid="stSidebar"] .st-expander {
+        border: 1px solid #444 !important;
+        background-color: #262730 !important;
     }
     
-    /* Migliora il contrasto del titolo dell'expander */
-    [data-testid="stExpanderDetails"] { border-top: 1px solid #444; }
-    summary { font-weight: bold; color: #fff !important; }
+    /* 2. Colora la freccia di giallo acceso o bianco per il massimo contrasto */
+    [data-testid="stSidebar"] svg[data-testid="stExpanderIcon"] {
+        fill: #fffd00 !important; /* Giallo acceso per essere sicuri di vederla */
+        color: #fffd00 !important;
+        width: 1.5rem !important;
+        height: 1.5rem !important;
+    }
 
-    /* Riduce lo spazio tra i widget */
+    /* 3. Evidenzia la barra del titolo al passaggio del mouse */
+    summary:hover {
+        background-color: #3e404b !important;
+        color: #fffd00 !important;
+    }
+
+    /* Riduzione spazi widget */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
+    .num-label { margin-bottom: -15px; margin-top: 5px; display: block; font-weight: bold; color: #eee; }
     
-    /* Spaziatura specifica per i titoli dei filtri numerici */
-    .num-label { margin-bottom: -15px; margin-top: 5px; display: block; }
+    /* Stile pulsanti */
+    .stButton>button { width: 100%; border-radius: 4px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -36,24 +44,19 @@ def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
-        
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
-        
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
-        
         df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
-        
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
                 if c: all_crests.add(c)
-        
         return df, sorted(list(all_crests))
     except Exception as e:
-        st.error(f"Errore caricamento dati: {e}")
+        st.error(f"Errore: {e}")
         return pd.DataFrame(), []
 
 df, available_crests = load_data()
@@ -63,45 +66,40 @@ if 'deck' not in st.session_state: st.session_state.deck = {}
 if 'preview' not in st.session_state and not df.empty: 
     st.session_state.preview = df.iloc[0].to_dict()
 
-# --- 4. SIDEBAR CON EXPANDER ---
+# --- 4. SIDEBAR ---
 st.sidebar.title("🔍 FILTRI")
 
 if not df.empty:
-    # --- GRUPPO 1: IDENTITÀ ---
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
-        f_name = st.text_input("Cerca nome...")
-        f_text = st.text_input("Cerca testo...")
-        f_trait = st.text_input("Cerca Tratto...")
+        f_name = st.text_input("Nome...")
+        f_text = st.text_input("Testo...")
+        f_trait = st.text_input("Tratto...")
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
-        f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+        f_type = st.selectbox("Tipo", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    # --- GRUPPO 2: STATISTICHE ---
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter_widget(label, key):
-            st.markdown(f"<span class='num-label'>**{label}**</span>", unsafe_allow_html=True)
+            st.markdown(f"<span class='num-label'>{label}</span>", unsafe_allow_html=True)
             cols = st.columns([0.2, 0.4, 0.4])
             active = cols[0].checkbox("", key=f"a_{key}")
             op = cols[1].selectbox("Op", ["=", ">", "<", ">=", "<="], key=f"o_{key}", label_visibility="collapsed")
             val = cols[2].number_input("Val", 0, 15, key=f"v_{key}", label_visibility="collapsed")
             return active, op, val
 
-        col_left, col_right = st.columns(2)
-        with col_left:
+        cl, cr = st.columns(2)
+        with cl:
             a_cost, o_cost, v_cost = num_filter_widget("Costo", "c")
             a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
-            
-        with col_right:
+        with cr:
             a_str, o_str, v_str = num_filter_widget("Forza", "s")
-            a_inf, o_inf, v_inf = num_filter_widget("Influence", "f")
+            a_inf, o_inf, v_inf = num_filter_widget("Influ.", "f")
 
-    # --- GRUPPO 3: ATTRIBUTI ---
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
         st.write("**Icone**")
         i_cols = st.columns(3)
         f_mil = i_cols[0].checkbox("MIL")
         f_int = i_cols[1].checkbox("INT")
         f_pow = i_cols[2].checkbox("POW")
-        
         st.write("**Creste**")
         sel_crests = [c for c in available_crests if st.checkbox(c, key=f"cr_{c}")]
 
@@ -133,7 +131,7 @@ if not df.empty:
     for c in sel_crests:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 5. LAYOUT RISULTATI ---
+# --- 5. LAYOUT ---
 c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
 
 with c_list:
@@ -147,8 +145,7 @@ with c_view:
     st.subheader("🖼️ Anteprima")
     p = st.session_state.get('preview')
     if p:
-        img_url = f"https://agot-lcg-search.pages.dev{p['full_image_url']}"
-        st.image(img_url, use_container_width=True)
+        st.image(f"https://agot-lcg-search.pages.dev{p['full_image_url']}", use_container_width=True)
         if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
             st.rerun()
@@ -169,7 +166,6 @@ with c_deck:
                 st.rerun()
             if tag == "D": m_count += q
             elif tag == "P": p_count += q
-    
     st.divider()
     st.write(f"**Mazzo:** {m_count}/60 | **Plots:** {p_count}/7")
     st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json")
