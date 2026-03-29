@@ -17,15 +17,15 @@ st.markdown("""
     /* Titoli Sezioni Mazzo */
     .deck-section-header {
         background-color: #1e1e1e;
-        padding: 6px 12px;
+        padding: 4px 12px;
         border-radius: 4px;
         color: #FFD700;
         font-weight: bold;
-        margin-top: 18px;
-        margin-bottom: 8px;
+        margin-top: 12px;
+        margin-bottom: 4px;
         border-left: 4px solid #FFD700;
         text-transform: uppercase;
-        font-size: 12px;
+        font-size: 11px;
     }
 
     /* LOGICA MOUSEOVER */
@@ -37,6 +37,9 @@ st.markdown("""
     }
     .card-hover-container:hover .card-hover-image { display: block; }
     .card-name-text { color: #1E90FF; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    
+    /* Compattezza Decklist */
+    .deck-row-container { margin-bottom: -12px; }
     
     hr { margin: 0.3rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.08) !important; }
     </style>
@@ -84,7 +87,7 @@ CREST_ICONS = {
     "War": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M18.3,5.7L12,12L13.4,13.4L19.7,7.1L18.3,5.7M5.7,5.7L7.1,4.3L13.4,10.6L12,12L5.7,5.7M12,12L18.3,18.3L16.9,19.7L10.6,13.4L12,12M12,12L5.7,18.3L4.3,16.9L10.6,10.6L12,12Z" fill="#800"/></svg>""",
     "Noble": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><circle cx="12" cy="12" r="8" fill="none" stroke="#D4AF37" stroke-width="2"/><circle cx="12" cy="5" r="2.5" fill="#D4AF37"/></svg>""",
     "Learned": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,21C13.45,19.9 15.45,19.5 17.5,19.5C19.3,19.5 21,19.8 22.5,20.5V6.5C21,5.4 18.9,5 17.5,5C15.45,5 13.45,5.4 12,6.5C10.55,5.4 8.55,5 6.5,5C4.55,5 2.45,5.4 1,6.5V21C2.45,19.9 4.55,19.5 6.5,19.5C8.55,19.5 10.55,19.9 12,21Z" fill="#5D4037"/></svg>""",
-    "Holy": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" fill="#81D4FA"/></svg>""",
+    "Holy": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,2H19V4L15,9V18H17V20H7V18H9V9L5,4V2Z" fill="#D4AF37" stroke="#996515" stroke-width="1"/></svg>""",
     "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
 }
 
@@ -225,6 +228,8 @@ with c_deck:
             if cards:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in cards)})</div>', unsafe_allow_html=True)
                 for row in sorted(cards, key=lambda x: x['cost'], reverse=True):
+                    # Wrap in a div to reduce space between rows
+                    st.markdown('<div class="deck-row-container">', unsafe_allow_html=True)
                     btn_col = render_card_row(row, "deck")
                     with btn_col:
                         if st.button(f"x{row['qty']}", key=f"rm_{row['name']}", help="Rimuovi 1"):
@@ -233,7 +238,7 @@ with c_deck:
                             st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
-                    st.markdown('<hr>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
     st.divider()
     s1, s2 = st.columns(2)
