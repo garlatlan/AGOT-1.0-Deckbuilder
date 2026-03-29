@@ -87,35 +87,4 @@ with col_preview:
     st.info(f"**Testo:** {p.get('rules_text', 'Nessuno')}")
     if st.session_state.deck:
         deck_df = df[df['name'].isin(st.session_state.deck.keys())].copy()
-        deck_df['qty'] = deck_df['name'].map(st.session_state.deck)
-        curve_df = deck_df[deck_df['card_type'].isin(['Character', 'Location', 'Event'])]
-        if not curve_df.empty:
-            fig = px.bar(curve_df, x='cost', y='qty', color='card_type', title="Curva Costi", barmode='group')
-            st.plotly_chart(fig, use_container_width=True)
-
-with col_deck:
-    st.subheader("Il Tuo Mazzo")
-    total_cards, plots, restricted_found = 0, 0, []
-    if not st.session_state.deck:
-        st.info("Aggiungi carte.")
-    else:
-        for name, qty in list(st.session_state.deck.items()):
-            c_info = df[df['name'] == name].iloc[0]
-            if c_info['is_restricted']: restricted_found.append(name)
-            
-            d1, d2, d3 = st.columns([0.65, 0.15, 0.2])
-            
-            # --- RIGA CORRETTA PER EVITARE SYNTAX ERROR ---
-            card_display_name = f"**{name}**"
-            if c_info['is_restricted']:
-                d1.markdown(f":red[{card_display_name}]")
-            else:
-                d1.markdown(card_display_name)
-            # ----------------------------------------------
-            
-            d2.write(f"x{qty}")
-            if d3.button("🗑️", key=f"del_{name}"):
-                if qty > 1: st.session_state.deck[name] -= 1
-                else: del st.session_state.deck[name]
-                st.rerun()
-            if c_info['card_type'] == 'Plot': plots +=
+        deck_df['qty']
