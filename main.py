@@ -8,10 +8,24 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
-    .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
+    .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.2rem; }
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
-    /* Allineamento verticale per la lista risultati */
-    .stButton { margin-top: 0px !important; }
+    
+    /* Stile per la testata della tabella */
+    .table-header {
+        font-weight: bold;
+        border-bottom: 2px solid #555;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #fffd00;
+    }
+    /* Stile per le celle della tabella */
+    .table-row {
+        border-bottom: 1px solid #333;
+        align-items: center;
+        display: flex;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,7 +80,7 @@ if not df.empty:
             a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
         with cr:
             a_str, o_str, v_str = num_filter_widget("Forza", "s")
-            a_inf, o_inf, v_inf = num_filter_widget("Influence", "f")
+            a_inf, o_inf, v_inf = num_filter_widget("Influ.", "f")
 
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
         st.write("**Icone**")
@@ -106,18 +120,48 @@ if not df.empty:
         filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
 # --- 5. LAYOUT ---
-c_list, c_view, c_deck = st.columns([2.0, 1.3, 1.7]) # Leggermente allargata la lista
+c_list, c_view, c_deck = st.columns([2.2, 1.1, 1.7])
 
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
-    with st.container(height=700):
+    
+    # Testata Tabella
+    h = st.columns([0.1, 0.45, 0.1, 0.15, 0.1, 0.1])
+    h[0].markdown("<div class='table-header'>$</div>", unsafe_allow_html=True)
+    h[1].markdown("<div class='table-header'>Nome</div>", unsafe_allow_html=True)
+    h[2].markdown("<div class='table-header'>Str</div>", unsafe_allow_html=True)
+    h[3].markdown("<div class='table-header'>Icone</div>", unsafe_allow_html=True)
+    h[4].markdown("<div class='table-header'>Cr</div>", unsafe_allow_html=True)
+    h[5].markdown("<div class='table-header'>Add</div>", unsafe_allow_html=True)
+
+    with st.container(height=650):
         for i, row in filtered.head(100).iterrows():
-            col_res = st.columns([0.85, 0.15])
-            # Tasto Nome (Anteprima)
-            if col_res[0].button(f"{row['name']} ({row['card_type']})", key=f"b{i}", use_container_width=True):
+            r = st.columns([0.1, 0.45, 0.1, 0.15, 0.1, 0.1])
+            
+            # Costo
+            r[0].write(f"**{row['cost']}**")
+            
+            # Nome (Pulsante per Anteprima)
+            if r[1].button(row['name'], key=f"name_{i}", use_container_width=True):
                 st.session_state.preview = row.to_dict()
-            # Tasto Aggiungi (+)
-            if col_res[1].button("➕", key=f"add_{i}"):
+            
+            # Forza (Strength)
+            str_val = row['strength'] if row['card_type'] == 'Character' else "-"
+            r[2].write(str_val)
+            
+            # Icone (Abbreviate)
+            icons = []
+            if "Military" in row['icons_list']: icons.append("M")
+            if "Intrigue" in row['icons_list']: icons.append("I")
+            if "Power" in row['icons_list']: icons.append("P")
+            r[3].write(" ".join(icons) if icons else "-")
+            
+            # Cresta
+            crest = row['crest_list'][0] if row['crest_list'] else "-"
+            r[4].write(crest)
+            
+            # Tasto Aggiungi
+            if r[5].button("➕", key=f"add_{i}"):
                 st.session_state.deck[row['name']] = st.session_state.get('deck', {}).get(row['name'], 0) + 1
                 st.rerun()
 
@@ -126,10 +170,9 @@ with c_view:
     p = st.session_state.get('preview')
     if p:
         img_url = f"https://agot-lcg-search.pages.dev{p['preview_image_url']}"
-        st.image(img_url, width=280)
-        # Rimosso il riquadro info blu come richiesto
+        st.image(img_url, width=240)
     else:
-        st.write("Seleziona una carta")
+        st.write("Clicca su un nome")
 
 with c_deck:
     st.subheader("📜 Mazzo")
