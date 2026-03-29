@@ -8,36 +8,38 @@ st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
-    .stMarkdown, p, label { font-size: 13px !important; }
+    .stMarkdown, p, label { font-size: 14px !important; }
     
-    /* Pulsanti generali */
-    .stButton>button { width: 100%; border-radius: 4px; padding: 0.1rem 0.3rem; min-height: 24px; }
+    /* Pulsante AGGIUNGI (Sinistra) - Standard */
+    .stButton>button { border-radius: 4px; }
+
+    /* COMPATTEZZA SELETTIVA SOLO PER LA COLONNA DECK (Destra) */
+    [data-testid="column"]:nth-child(2) .stElementContainer {
+        margin-bottom: -0.85rem !important;
+    }
     
-    .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
-    .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
-    
-    /* COMPATTEZZA ESTREMA MAZZO */
+    [data-testid="column"]:nth-child(2) .stButton>button {
+        padding: 0px 2px !important;
+        min-height: 22px !important;
+        height: 22px !important;
+        font-size: 11px !important;
+    }
+
     .deck-section-header {
         background-color: #1e1e1e;
         padding: 2px 10px;
         border-radius: 4px;
         color: #FFD700;
         font-weight: bold;
-        margin-top: 6px;
+        margin-top: 10px;
         margin-bottom: 2px;
         border-left: 3px solid #FFD700;
         text-transform: uppercase;
         font-size: 11px;
     }
 
-    /* Riduzione spazi tra righe */
-    [data-testid="stVerticalBlock"] > div {
-        gap: 0rem !important;
-    }
-    
-    .stElementContainer {
-        margin-bottom: -0.6rem !important;
-    }
+    .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
+    .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
 
     /* LOGICA MOUSEOVER */
     .card-hover-container { position: relative; display: inline-block; width: 100%; cursor: help; }
@@ -47,9 +49,9 @@ st.markdown("""
         pointer-events: none; background-color: #000;
     }
     .card-hover-container:hover .card-hover-image { display: block; }
-    .card-name-text { color: #1E90FF; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px; }
+    .card-name-text { color: #1E90FF; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     
-    hr { margin: 0.1rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.05) !important; }
+    hr { margin: 0.2rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.08) !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -84,9 +86,9 @@ def load_data():
 df, available_crests = load_data()
 
 # --- 4. ICONE SVG ---
-SVG_COIN = """<svg viewBox="0 0 32 32" width="20" height="20"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
-SVG_SHIELD = """<svg viewBox="0 0 32 32" width="22" height="22"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
-ICON_SIZE = 17
+SVG_COIN = """<svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
+SVG_SHIELD = """<svg viewBox="0 0 32 32" width="28" height="28"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
+ICON_SIZE = 19
 SVG_MIL = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>"""
 SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
 SVG_POW = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,16L3,5L8.5,10L12,4L15.5,10L21,5L19,16H5M19,19A1,1 0 0,1 18,20H6A1,1 0 0,1 5,19V18H19V19Z" fill="#00008b"/></svg>"""
@@ -156,11 +158,11 @@ if not df.empty:
 
 # --- 6. FUNZIONE RENDER RIGA ---
 def render_card_row(row, key_prefix):
-    cols = st.columns([0.1, 0.45, 0.08, 0.25, 0.12])
+    cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
     # 1. Costo
     with cols[0]:
         if row['card_type'] not in ['House', 'Agenda', 'Plot']:
-            st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:3px; font-size:11px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:13px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
         elif row['card_type'] == 'Plot':
             st.write(f"({row['income']})")
     # 2. Nome
@@ -171,19 +173,19 @@ def render_card_row(row, key_prefix):
     # 3. Forza
     with cols[2]:
         if row['card_type'] == 'Character':
-            st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:5px; font-size:11px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
-    # 4. Icone e Creste
+            st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
+    # 4. Icone (Slot Fissi) + Creste (Separato)
     with cols[3]:
         ic_html = f"""
         <div style="display:flex; align-items:center;">
-            <div style="display:flex; gap:1px; width:55px;">
-                <div style="width:17px; height:17px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>
-                <div style="width:17px; height:17px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>
-                <div style="width:17px; height:17px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div>
+            <div style="display:flex; gap:2px; width:65px;">
+                <div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>
+                <div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>
+                <div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div>
             </div>
-            <div style="display:flex; gap:2px; margin-left:8px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:5px;">
+            <div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">
         """
-        for cr in row['crest_list']: ic_html += f'<div style="width:17px; height:17px;">{CREST_ICONS.get(cr, "")}</div>'
+        for cr in row['crest_list']: ic_html += f'<div style="width:19px; height:19px;">{CREST_ICONS.get(cr, "")}</div>'
         ic_html += '</div></div>'
         st.markdown(ic_html, unsafe_allow_html=True)
     # 5. Bottone
@@ -195,7 +197,7 @@ c_list, c_deck = st.columns([2.5, 2.5])
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
     st.divider()
-    with st.container(height=800):
+    with st.container(height=750):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list")
             if btn_col.button("➕", key=f"add_{row['id']}"):
@@ -214,7 +216,7 @@ with c_deck:
         st.session_state.agenda_choice = st.selectbox("Agenda", agendas, index=agendas.index(st.session_state.agenda_choice) if st.session_state.agenda_choice in agendas else 0)
     
     m_count, p_count = 0, 0
-    with st.container(height=700):
+    with st.container(height=650):
         deck_cards = []
         for name, qty in st.session_state.deck.items():
             matches = df[df['name'] == name]
