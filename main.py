@@ -114,12 +114,14 @@ with c_list:
                 st.session_state.preview = row.to_dict()
 
 with c_view:
-    st.subheader("🖼️ Anteprima (Low-Res)")
+    st.subheader("🖼️ Anteprima")
     p = st.session_state.get('preview')
     if p:
-        # QUI USIAMO SEMPRE LA PREVIEW JPG PER VELOCITÀ
         img_url = f"https://agot-lcg-search.pages.dev{p['preview_image_url']}"
-        st.image(img_url, use_container_width=True)
+        
+        # Ridotto la dimensione per evitare sgranature
+        # width=250 forza la larghezza rendendola più nitida nella colonna
+        st.image(img_url, width=280)
         
         if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
@@ -144,6 +146,5 @@ with c_deck:
             if tag == "D": m_count += q
             elif tag == "P": p_count += q
     st.divider()
-    # Il tasto salva scarica il JSON. Quando faremo il tasto "PDF", 
-    # useremo internamente il campo 'full_image_url' per le proxy.
+    st.write(f"**Mazzo:** {m_count}/60 | **Plots:** {p_count}/7")
     st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json", use_container_width=True)
