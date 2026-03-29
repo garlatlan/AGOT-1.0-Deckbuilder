@@ -12,16 +12,19 @@ st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
+    [data-testid="stSidebar"] { min-width: 350px; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; padding: 0.2rem 0.5rem; }
+    
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
+    
     .deck-section-header {
         background-color: #1e1e1e; padding: 6px 12px; border-radius: 4px; color: #FFD700;
         font-weight: bold; margin-top: 18px; margin-bottom: 8px; border-left: 4px solid #FFD700;
         text-transform: uppercase; font-size: 12px;
     }
+
     .card-hover-container { position: relative; display: inline-block; width: 100%; cursor: help; }
     .card-hover-image {
         display: none; position: fixed; left: 30px; top: 60px; z-index: 999999 !important;
@@ -30,6 +33,7 @@ st.markdown("""
     }
     .card-hover-container:hover .card-hover-image { display: block; }
     .card-name-text { color: #1E90FF; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    
     hr { margin: 0.3rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.08) !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -44,7 +48,8 @@ if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Ne
 def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
-            df = pd.DataFrame(json.load(f))
+            data = json.load(f)
+        df = pd.DataFrame(data)
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
@@ -52,13 +57,15 @@ def load_data():
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         df['is_unique'] = df['name'].str.contains(r'^\*') | df.get('unique', False)
+        
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
                 if c: all_crests.add(c)
         return df, sorted(list(all_crests))
     except Exception as e:
-        st.error(f"Errore: {e}"); return pd.DataFrame(), []
+        st.error(f"Errore caricamento: {e}")
+        return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
@@ -78,53 +85,35 @@ CREST_ICONS = {
     "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
 }
 
-# --- 5. FUNZIONE GENERAZIONE PDF ---
+# --- 5. LOGICA PDF ---
 def generate_proxy_pdf(deck_cards):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-
-    # Dimensioni carta (standard CCG)
-    card_w = 63.5 * mm
-    card_h = 88.9 * mm
-    gap = 0.5 * mm  # Margine richiesto
-    
-    # Margini pagina per centrare la griglia 3x3
+    card_w, card_h = 63.5 * mm, 88.9 * mm
+    gap = 0.5 * mm
     margin_x = (width - (3 * card_w + 2 * gap)) / 2
     margin_y = (height - (3 * card_h + 2 * gap)) / 2
 
-    # Creazione lista piatta di tutte le immagini (considerando la quantità)
-    all_images = []
+    all_imgs = []
     for card in deck_cards:
-        img_url = f"https://agot-lcg-search.pages.dev{card['preview_image_url']}"
-        for _ in range(card['qty']):
-            all_images.append(img_url)
+        url = f"https://agot-lcg-search.pages.dev{card['preview_image_url']}"
+        for _ in range(card['qty']): all_imgs.append(url)
 
     x_idx, y_idx = 0, 0
-    
-    for img_url in all_images:
+    for url in all_imgs:
         try:
-            # Scarica immagine
-            response = requests.get(img_url)
-            img_data = BytesIO(response.content)
-            
-            # Calcola posizione (partendo dall'alto a sinistra)
+            resp = requests.get(url)
+            img_io = BytesIO(resp.content)
             curr_x = margin_x + x_idx * (card_w + gap)
-            curr_y = margin_y + (2 - y_idx) * (card_h + gap) # Invertiamo Y per reportlab
-            
-            c.drawImage(img_data, curr_x, curr_y, width=card_w, height=card_h)
-            
+            curr_y = margin_y + (2 - y_idx) * (card_h + gap)
+            c.drawImage(img_io, curr_x, curr_y, width=card_w, height=card_h)
             x_idx += 1
             if x_idx > 2:
-                x_idx = 0
-                y_idx += 1
-            
+                x_idx = 0; y_idx += 1
             if y_idx > 2:
-                c.showPage()
-                x_idx, y_idx = 0, 0
-        except:
-            continue
-
+                c.showPage(); x_idx, y_idx = 0, 0
+        except: continue
     c.save()
     buffer.seek(0)
     return buffer
@@ -145,59 +134,112 @@ def render_card_row(row, key_prefix):
         if row['card_type'] == 'Character':
             st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
     with cols[3]:
-        ic_html = f"""<div style="display:flex; align-items:center;"><div style="display:flex; gap:2px; width:65px;">
-        <div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>
-        <div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>
-        <div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div></div>
-        <div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">"""
+        ic_html = f"""
+        <div style="display:flex; align-items:center;">
+            <div style="display:flex; gap:2px; width:65px;">
+                <div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>
+                <div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>
+                <div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div>
+            </div>
+            <div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">
+        """
         for cr in row['crest_list']: ic_html += f'<div style="width:19px; height:19px;">{CREST_ICONS.get(cr, "")}</div>'
         ic_html += '</div></div>'
         st.markdown(ic_html, unsafe_allow_html=True)
     return cols[4]
 
-# --- 7. SIDEBAR FILTRI (omessa per brevità, resta invariata) ---
-# ... (Inserire qui la logica filtri del messaggio precedente) ...
+# --- 7. SIDEBAR FILTRI ---
+st.sidebar.title("🔍 FILTRI")
+if not df.empty:
+    with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
+        f_name = st.text_input("Nome...")
+        f_trait = st.text_input("Tratto...")
+        f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
+        f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+
+    with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=True):
+        f_mil = st.sidebar.checkbox("MIL"); f_int = st.sidebar.checkbox("INT"); f_pow = st.sidebar.checkbox("POW")
+        sel_crests = [c for c in available_crests if st.sidebar.checkbox(c)]
+
+    filtered = df.copy()
+    if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
+    if f_trait: filtered = filtered[filtered['traits_str'].str.contains(f_trait.lower())]
+    if f_house != "Tutte": filtered = filtered[filtered['house_str'] == f_house]
+    if f_type != "Tutti": filtered = filtered[filtered['card_type'] == f_type]
+    if f_mil: filtered = filtered[filtered['icons_list'].apply(lambda x: "Military" in x)]
+    if f_int: filtered = filtered[filtered['icons_list'].apply(lambda x: "Intrigue" in x)]
+    if f_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
+    for c in sel_crests: filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
 # --- 8. LAYOUT PRINCIPALE ---
 c_list, c_deck = st.columns([2.5, 2.5])
 
 with c_list:
-    # (Logica lista risultati invariata)
-    st.subheader(f"🗃️ Risultati")
-    # ... loop cards ...
+    st.subheader(f"🗃️ Risultati ({len(filtered)})")
+    st.divider()
+    with st.container(height=750):
+        for i, row in filtered.head(100).iterrows():
+            btn_col = render_card_row(row, "list")
+            if btn_col.button("➕", key=f"add_{row['id']}"):
+                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
+                st.rerun()
+            st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_deck:
     st.subheader("📜 Deck")
-    # Setup Casata/Agenda e Upload JSON...
-    # (Logica caricamento e visualizzazione mazzo invariata)
+    # Header mazzo
+    col_h, col_a = st.columns(2)
+    with col_h: 
+        houses = sorted(df[df['card_type'] == 'House']['name'].unique().tolist())
+        st.session_state.house_choice = st.selectbox("Casata", houses, index=houses.index(st.session_state.house_choice) if st.session_state.house_choice in houses else 0)
+    with col_a: 
+        agendas = ["Nessuna Agenda"] + sorted(df[df['card_type'] == 'Agenda']['name'].unique().tolist())
+        st.session_state.agenda_choice = st.selectbox("Agenda", agendas, index=agendas.index(st.session_state.agenda_choice) if st.session_state.agenda_choice in agendas else 0)
     
-    # Prepariamo i dati delle carte per il PDF
-    deck_cards = []
-    for name, qty in st.session_state.deck.items():
-        matches = df[df['name'] == name]
-        if not matches.empty:
-            c_data = matches.iloc[0].to_dict()
-            c_data['qty'] = qty
-            deck_cards.append(c_data)
+    # Upload
+    up = st.file_uploader("📂 Import JSON", type="json", label_visibility="collapsed")
+    if up:
+        d = json.load(up)
+        st.session_state.deck, st.session_state.house_choice, st.session_state.agenda_choice = d.get("Deck",{}), d.get("House","Stark"), d.get("Agenda","Nessuna Agenda")
+        st.rerun()
 
-    # --- FOOTER & ESPORTAZIONE ---
+    m_count, p_count = 0, 0
+    deck_list = []
+    for name, qty in st.session_state.deck.items():
+        m = df[df['name'] == name]
+        if not m.empty:
+            c_d = m.iloc[0].to_dict(); c_d['qty'] = qty; deck_list.append(c_d)
+
+    with st.container(height=550):
+        cats = {
+            "PLOT": [c for c in deck_list if c['card_type'] == 'Plot'],
+            "PERSONAGGI UNICI": [c for c in deck_list if c['card_type'] == 'Character' and c['is_unique']],
+            "PERSONAGGI NON UNICI": [c for c in deck_list if c['card_type'] == 'Character' and not c['is_unique']],
+            "LUOGHI": [c for c in deck_list if c['card_type'] == 'Location'],
+            "ATTACHMENT": [c for c in deck_list if c['card_type'] == 'Attachment'],
+            "EVENTI": [c for c in deck_list if c['card_type'] == 'Event']
+        }
+        for label, cards in cats.items():
+            if cards:
+                st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in cards)})</div>', unsafe_allow_html=True)
+                for r in sorted(cards, key=lambda x: x['cost'], reverse=True):
+                    bc = render_card_row(r, "dk")
+                    if bc.button(f"x{r['qty']}", key=f"rm_{r['name']}"):
+                        if r['qty'] > 1: st.session_state.deck[r['name']] -= 1
+                        else: del st.session_state.deck[r['name']]
+                        st.rerun()
+                    if r['card_type'] == 'Plot': p_count += r['qty']
+                    else: m_count += r['qty']
+                    st.markdown('<hr>', unsafe_allow_html=True)
+
     st.divider()
-    c_btn1, c_btn2 = st.columns(2)
+    s1, s2 = st.columns(2)
+    s1.metric("Mazzo (Draw)", f"{m_count}/60")
+    s2.metric("Plots", f"{p_count}/7")
     
-    # JSON Export
-    export_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck}, indent=4)
-    c_btn1.download_button("💾 SALVA JSON", export_json, "mazzo.json", use_container_width=True)
-    
-    # PDF PROXY GENERATION
-    if deck_cards:
-        with st.spinner("Generazione PDF in corso..."):
-            pdf_file = generate_proxy_pdf(deck_cards)
-            c_btn2.download_button(
-                label="🖨️ SCARICA PDF PROXY",
-                data=pdf_file,
-                file_name="proxy_mazzo.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-    else:
-        c_btn2.button("🖨️ PDF PROXY (Vuoto)", disabled=True, use_container_width=True)
+    exp_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck}, indent=2)
+    b1, b2 = st.columns(2)
+    b1.download_button("💾 SALVA JSON", exp_json, "mazzo.json", use_container_width=True)
+    if deck_list:
+        pdf = generate_proxy_pdf(deck_list)
+        b2.download_button("🖨️ PDF PROXY", pdf, "proxy.pdf", "application/pdf", use_container_width=True)
