@@ -9,25 +9,40 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 320px; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { width: 100%; border-radius: 4px; }
+    /* Rimuove lo spazio eccessivo tra i widget nella sidebar */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 2. CARICAMENTO DATI ---
 @st.cache_data
 def load_data():
-    with open('agot1.json', 'r', encoding='utf-8') as f:
-        df = pd.DataFrame(json.load(f))
-    df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
-    for col in ['cost', 'strength', 'income', 'influence']:
-        df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
-    df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
-    df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
-    
-    all_crests = set()
-    for sublist in df['crest_list']:
-        for c in sublist:
-            if c: all_crests.add(c)
-    return df, sorted(list(all_crests))
+    try:
+        with open('agot1.json', 'r', encoding='utf-8') as f:
+            df = pd.DataFrame(json.load(f))
+        
+        # Normalizzazione Casata
+        df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
+        
+        # Conversione Numerica (Cost, STR, Inc, Inf)
+        for col in ['cost', 'strength', 'income', 'influence']:
+            df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
+        
+        # Liste per Icone e Creste (chiave 'crest' al singolare dal tuo JSON)
+        df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
+        df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
+        df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
+        
+        # Estrazione Creste Dinamiche
+        all_crests = set()
+        for sublist in df['crest_list']:
+            for c in sublist:
+                if c: all_crests.add(c)
+        
+        return df, sorted(list(all_crests))
+    except Exception as e:
+        st.error(f"Errore caricamento dati: {e}")
+        return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
@@ -44,24 +59,30 @@ if not df.empty:
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
         f_name = st.text_input("Cerca nome...")
         f_text = st.text_input("Cerca testo...")
+        f_trait = st.text_input("Cerca Tratto (es. Knight)...")
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
         f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
 
-    # --- GRUPPO 2: STATISTICHE ---
+    # --- GRUPPO 2: STATISTICHE (LAYOUT RICHIESTO) ---
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter_widget(label, key):
-            c = st.columns([0.2, 0.4, 0.4])
-            active = c[0].checkbox("", key=f"a_{key}")
-            op = c[1].selectbox(label, ["=", ">", "<"], key=f"o_{key}", label_visibility="collapsed")
-            val = c[2].number_input(label, 0, 10, key=f"v_{key}", label_visibility="collapsed")
+            st.write(f"**{label}**") # Titolo sopra ad ogni casella
+            cols = st.columns([0.2, 0.4, 0.4])
+            active = cols[0].checkbox("", key=f"a_{key}")
+            op = cols[1].selectbox("Op", ["=", ">", "<", ">=", "<="], key=f"o_{key}", label_visibility="collapsed")
+            val = cols[2].number_input("Val", 0, 15, key=f"v_{key}", label_visibility="collapsed")
             return active, op, val
 
-        st.write("**Costo | Forza**")
-        a_cost, o_cost, v_cost = num_filter_widget("Cost", "c")
-        a_str, o_str, v_str = num_filter_widget("STR", "s")
-        st.write("**Income | Influence**")
-        a_inc, o_inc, v_inc = num_filter_widget("Inc", "i")
-        a_inf, o_inf, v_inf = num_filter_widget("Inf", "f")
+        col_left, col_right = st.columns(2)
+        with col_left:
+            a_cost, o_cost, v_cost = num_filter_widget("Costo", "c")
+            st.write("") 
+            a_inc, o_inc, v_inc = num_filter_widget("Income", "i")
+            
+        with col_right:
+            a_str, o_str, v_str = num_filter_widget("Forza", "s")
+            st.write("")
+            a_inf, o_inf, v_inf = num_filter_widget("Influence", "f")
 
     # --- GRUPPO 3: ATTRIBUTI ---
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=False):
@@ -78,6 +99,7 @@ if not df.empty:
     filtered = df.copy()
     if f_name: filtered = filtered[filtered['name'].str.contains(f_name, case=False)]
     if f_text: filtered = filtered[filtered['rules_text'].fillna("").str.contains(f_text, case=False)]
+    if f_trait: filtered = filtered[filtered['traits_str'].str.contains(f_trait.lower())]
     if f_house != "Tutte": filtered = filtered[filtered['house_str'] == f_house]
     if f_type != "Tutti": filtered = filtered[filtered['card_type'] == f_type]
 
@@ -86,6 +108,8 @@ if not df.empty:
         if op == "=": return df_in[df_in[col] == val]
         if op == ">": return df_in[df_in[col] > val]
         if op == "<": return df_in[df_in[col] < val]
+        if op == ">=": return df_in[df_in[col] >= val]
+        if op == "<=": return df_in[df_in[col] <= val]
         return df_in
 
     filtered = apply_op(filtered, 'cost', a_cost, o_cost, v_cost)
@@ -103,30 +127,41 @@ if not df.empty:
 c_list, c_view, c_deck = st.columns([1.8, 1.5, 1.7])
 
 with c_list:
-    st.write(f"**Risultati ({len(filtered)})**")
+    st.subheader(f"🗃️ Risultati ({len(filtered)})")
     with st.container(height=700):
         for i, row in filtered.head(100).iterrows():
             if st.button(f"{row['name']} ({row['card_type']})", key=f"b{i}"):
                 st.session_state.preview = row.to_dict()
 
 with c_view:
-    st.write("**Anteprima**")
+    st.subheader("🖼️ Anteprima")
     p = st.session_state.get('preview')
     if p:
-        st.image(f"https://agot-lcg-search.pages.dev{p['full_image_url']}", use_container_width=True)
+        img_url = f"https://agot-lcg-search.pages.dev{p['full_image_url']}"
+        st.image(img_url, use_container_width=True)
         if st.button("➕ AGGIUNGI AL MAZZO", type="primary"):
             st.session_state.deck[p['name']] = st.session_state.get('deck', {}).get(p['name'], 0) + 1
             st.rerun()
+        st.info(f"**Testo:** {p.get('rules_text', 'N/A')}")
 
 with c_deck:
-    st.write("**Mazzo Attuale**")
+    st.subheader("📜 Mazzo")
+    m_count, p_count = 0, 0
     with st.container(height=550):
         for n, q in st.session_state.get('deck', {}).items():
+            card_data = df[df['name'] == n].iloc[0]
+            tag = "P" if card_data['card_type'] == 'Plot' else ("S" if card_data['card_type'] in ['House', 'Agenda'] else "D")
+            
             col_d = st.columns([0.7, 0.3])
-            col_d[0].write(f"**{n}** x{q}")
+            col_d[0].write(f"**[{tag}] {n}** x{q}")
             if col_d[1].button("🗑️", key=f"rm_{n}"):
                 if q > 1: st.session_state.deck[n] -= 1
                 else: del st.session_state.deck[n]
                 st.rerun()
+            
+            if tag == "D": m_count += q
+            elif tag == "P": p_count += q
     
+    st.divider()
+    st.write(f"**Mazzo:** {m_count}/60 | **Plots:** {p_count}/7")
     st.download_button("💾 SALVA JSON", json.dumps(st.session_state.get('deck', {})), "mazzo.json")
