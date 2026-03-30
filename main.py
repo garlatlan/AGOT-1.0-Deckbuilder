@@ -2,16 +2,16 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE ---
+# --- 1. CONFIGURAZIONE E STILE ---
 st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
+    [data-testid="stSidebar"] { min-width: 350px; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { border-radius: 4px; }
 
-    /* COMPATTEZZA SELETTIVA COLONNA DECK */
+    /* Compattazione colonna Deck */
     [data-testid="column"]:nth-child(2) .stElementContainer { margin-bottom: -0.85rem !important; }
     [data-testid="column"]:nth-child(2) .stButton>button {
         padding: 0px 2px !important;
@@ -57,18 +57,25 @@ def reset_filters():
 def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
-            df = pd.DataFrame(json.load(f))
+            data = json.load(f)
+            df = pd.DataFrame(data)
+        
         df['id_str'] = df['id'].astype(str)
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
+        
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
+            
         df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         df['is_unique'] = df['name'].str.contains(r'^\*') | df.get('unique', False)
+        
         all_crests = {c for sublist in df['crest_list'] for c in sublist if c}
         return df, sorted(list(all_crests))
-    except: return pd.DataFrame(), []
+    except Exception as e:
+        st.error(f"Errore caricamento database: {e}")
+        return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
@@ -88,9 +95,9 @@ CREST_ICONS = {
     "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
 }
 
-# --- 5. SIDEBAR FILTRI ---
+# --- 5. SIDEBAR FILTRI (TUTTI RIPRISTINATI) ---
 st.sidebar.title("🔍 FILTRI")
-if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True, type="secondary"):
+if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True):
     reset_filters()
     st.rerun()
 
@@ -135,20 +142,23 @@ if not df.empty:
     if f_trait: filtered = filtered[filtered['traits_str'].str.contains(f_trait.lower())]
     if f_house != "Tutte": filtered = filtered[filtered['house_str'] == f_house]
     if f_type != "Tutti": filtered = filtered[filtered['card_type'] == f_type]
+    
     def apply_op(df_in, col, active, op, val):
         if not active: return df_in
         ops = {"=": df_in[col] == val, ">": df_in[col] > val, "<": df_in[col] < val, ">=": df_in[col] >= val, "<=": df_in[col] <= val}
         return df_in[ops[op]]
+    
     filtered = apply_op(filtered, 'cost', a_cost, o_cost, v_cost)
     filtered = apply_op(filtered, 'strength', a_str, o_str, v_str)
     filtered = apply_op(filtered, 'income', a_inc, o_inc, v_inc)
     filtered = apply_op(filtered, 'influence', a_inf, o_inf, v_inf)
+    
     if f_mil: filtered = filtered[filtered['icons_list'].apply(lambda x: "Military" in x)]
     if f_int: filtered = filtered[filtered['icons_list'].apply(lambda x: "Intrigue" in x)]
     if f_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
     for c in sel_crests: filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. FUNZIONI RENDERING ---
+# --- 6. RENDERING CARTE ---
 def render_card_row(row, key_prefix, i=0):
     cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
     with cols[0]:
@@ -175,9 +185,9 @@ with c_list:
     with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list", i)
-            cur_id = row['id_str']
-            if btn_col.button("➕", key=f"add_{cur_id}_{i}"):
-                st.session_state.deck[cur_id] = st.session_state.deck.get(cur_id, 0) + 1
+            cid = row['id_str']
+            if btn_col.button("➕", key=f"add_{cid}_{i}"):
+                st.session_state.deck[cid] = st.session_state.deck.get(cid, 0) + 1
                 st.rerun()
             st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -212,10 +222,9 @@ with c_deck:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
                 for i, row in enumerate(sorted(subset, key=lambda x: x['cost'], reverse=True)):
                     btn_col = render_card_row(row, "deck", i)
-                    cid_rm = row['id_str']
-                    if btn_col.button(f"x{row['qty']}", key=f"rm_{cid_rm}_{i}"):
-                        if row['qty'] > 1: st.session_state.deck[cid_rm] -= 1
-                        else: del st.session_state.deck[cid_rm]
+                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['id_str']}_{i}"):
+                        if row['qty'] > 1: st.session_state.deck[row['id_str']] -= 1
+                        else: del st.session_state.deck[row['id_str']]
                         st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
@@ -235,30 +244,34 @@ with c_deck:
             col_curve[i].caption(ct)
             col_curve[i].bar_chart(pd.Series(counts), height=120)
 
-    # --- 8. IMPORT / EXPORT (CON MIGRAZIONE ID) ---
+    # --- 8. IMPORT / EXPORT RESILIENTE ---
     st.divider()
     exp_col1, exp_col2 = st.columns(2)
     export_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck}, indent=2)
     exp_col1.download_button("💾 SALVA JSON", export_json, "mazzo.json", use_container_width=True)
     
     uploaded_file = exp_col2.file_uploader("📂 CARICA", type="json", label_visibility="collapsed")
-    if uploaded_file and st.button("✅ CONFERMA IMPORT", use_container_width=True):
-        try:
-            data = json.load(uploaded_file)
-            raw_deck = data.get("Deck", {})
-            new_deck = {}
-            for key, qty in raw_deck.items():
-                if key in df['id_str'].values:
-                    new_deck[key] = qty
-                else:
-                    # Se è un nome (vecchio formato), trova il primo ID corrispondente
-                    match = df[df['name'] == key]
-                    if not match.empty:
-                        new_deck[match.iloc[0]['id_str']] = qty
-            
-            st.session_state.deck = new_deck
-            st.session_state.house_choice = data.get("House", "Stark")
-            st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
-            st.success("Mazzo caricato e convertito!")
-            st.rerun()
-        except: st.error("Errore nel file JSON.")
+    if uploaded_file:
+        if st.button("✅ CONFERMA IMPORT", use_container_width=True):
+            try:
+                data = json.load(uploaded_file)
+                raw_deck = data.get("Deck", {})
+                new_deck = {}
+                
+                for key, qty in raw_deck.items():
+                    # 1. Prova se la chiave è un ID valido
+                    if key in df['id_str'].values:
+                        new_deck[key] = qty
+                    else:
+                        # 2. Se è un nome (vecchio formato), cerca l'ID corrispondente
+                        match = df[df['name'] == key]
+                        if not match.empty:
+                            new_deck[match.iloc[0]['id_str']] = qty
+                
+                st.session_state.deck = new_deck
+                st.session_state.house_choice = data.get("House", "Stark")
+                st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
+                st.success("Mazzo caricato e convertito!")
+                st.rerun()
+            except:
+                st.error("Errore nel file JSON.")
