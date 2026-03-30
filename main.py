@@ -43,7 +43,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. SESSION STATE ---
-if 'deck' not in st.session_state: st.session_state.deck = {} # Chiave sarà l'ID (stringa)
+if 'deck' not in st.session_state: st.session_state.deck = {} 
 if 'house_choice' not in st.session_state: st.session_state.house_choice = "Stark"
 if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Nessuna Agenda"
 
@@ -57,21 +57,33 @@ def reset_filters():
 def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
-            df = pd.DataFrame(json.load(f))
-        df['id_str'] = df['id'].astype(str) # ID come stringa per coerenza con JSON
+            data = json.load(f)
+            df = pd.DataFrame(data)
+        
+        # CREAZIONE COLONNE ESSENZIALI
+        if 'id' in df.columns:
+            df['id_str'] = df['id'].astype(str)
+        else:
+            df['id_str'] = df.index.astype(str)
+            
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
+        
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
+            
         df['icons_list'] = df['icons'].apply(lambda x: x if isinstance(x, list) else [])
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         df['is_unique'] = df['name'].str.contains(r'^\*') | df.get('unique', False)
+        
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
                 if c: all_crests.add(c)
         return df, sorted(list(all_crests))
-    except: return pd.DataFrame(), []
+    except Exception as e:
+        st.error(f"Errore critico: {e}")
+        return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
@@ -178,8 +190,10 @@ with c_list:
     with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list")
-            if btn_col.button("➕", key=f"add_{row['id_str']}"):
-                st.session_state.deck[row['id_str']] = st.session_state.deck.get(row['id_str'], 0) + 1
+            # PROTEZIONE: se id_str non esiste per qualche motivo, usa l'indice
+            cur_id = row.get('id_str', str(i))
+            if btn_col.button("➕", key=f"add_{cur_id}_{i}"):
+                st.session_state.deck[cur_id] = st.session_state.deck.get(cur_id, 0) + 1
                 st.rerun()
             st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -213,9 +227,10 @@ with c_deck:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
                 for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
                     btn_col = render_card_row(row, "deck")
-                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['id_str']}"):
-                        if row['qty'] > 1: st.session_state.deck[row['id_str']] -= 1
-                        else: del st.session_state.deck[row['id_str']]
+                    cid_rm = row.get('id_str', 'err')
+                    if btn_col.button(f"x{row['qty']}", key=f"rm_{cid_rm}"):
+                        if row['qty'] > 1: st.session_state.deck[cid_rm] -= 1
+                        else: del st.session_state.deck[cid_rm]
                         st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
@@ -235,7 +250,6 @@ with c_deck:
             col_curve[i].caption(ct)
             col_curve[i].bar_chart(pd.Series(counts), height=120)
 
-    # --- 8. IMPORT / EXPORT ---
     st.divider()
     exp_col1, exp_col2 = st.columns(2)
     export_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck})
