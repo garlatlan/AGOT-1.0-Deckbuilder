@@ -10,25 +10,17 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { border-radius: 4px; }
-
-    /* Compattazione colonna Deck */
     [data-testid="column"]:nth-child(2) .stElementContainer { margin-bottom: -0.85rem !important; }
     [data-testid="column"]:nth-child(2) .stButton>button {
-        padding: 0px 2px !important;
-        min-height: 22px !important;
-        height: 22px !important;
-        font-size: 11px !important;
+        padding: 0px 2px !important; min-height: 22px !important; height: 22px !important; font-size: 11px !important;
     }
-
     .deck-section-header {
         background-color: #1e1e1e; padding: 2px 10px; border-radius: 4px;
         color: #FFD700; font-weight: bold; margin-top: 10px; margin-bottom: 2px;
         border-left: 3px solid #FFD700; text-transform: uppercase; font-size: 11px;
     }
-
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
-
     .card-hover-container { position: relative; display: inline-block; width: 100%; cursor: help; }
     .card-hover-image {
         display: none; position: fixed; left: 30px; top: 60px; z-index: 999999 !important;
@@ -37,7 +29,6 @@ st.markdown("""
     }
     .card-hover-container:hover .card-hover-image { display: block; }
     .card-name-text { color: #1E90FF; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-    
     hr { margin: 0.2rem 0 !important; border: 0; border-top: 1px solid rgba(255,255,255,0.08) !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -76,16 +67,16 @@ df, available_crests = load_data()
 SVG_COIN = """<svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
 SVG_SHIELD = """<svg viewBox="0 0 32 32" width="28" height="28"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
 ICON_SIZE = 19
-SVG_MIL = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>"""
-SVG_INT = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>"""
-SVG_POW = f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,16L3,5L8.5,10L12,4L15.5,10L21,5L19,16H5M19,19A1,1 0 0,1 18,20H6A1,1 0 0,1 5,19V18H19V19Z" fill="#00008b"/></svg>"""
+SVG_MIL = f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M13,2V5.17C15.83,5.63 18,8.1 18,11V18H20V20H4V18H6V11C6,8.1 8.17,5.63 11,5.17V2H13M12,22A2,2 0 0,1 10,20H14A2,2 0 0,1 12,22Z" fill="#cc0000"/></svg>'
+SVG_INT = f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" fill="#006400"/></svg>'
+SVG_POW = f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M5,16L3,5L8.5,10L12,4L15.5,10L21,5L19,16H5M19,19A1,1 0 0,1 18,20H6A1,1 0 0,1 5,19V18H19V19Z" fill="#00008b"/></svg>'
 
 CREST_ICONS = {
-    "War": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M18.3,5.7L12,12L13.4,13.4L19.7,7.1L18.3,5.7M5.7,5.7L7.1,4.3L13.4,10.6L12,12L5.7,5.7M12,12L18.3,18.3L16.9,19.7L10.6,13.4L12,12M12,12L5.7,18.3L4.3,16.9L10.6,10.6L12,12Z" fill="#800"/></svg>""",
-    "Noble": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><circle cx="12" cy="12" r="8" fill="none" stroke="#D4AF37" stroke-width="2"/><circle cx="12" cy="5" r="2.5" fill="#D4AF37"/></svg>""",
-    "Learned": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,21C13.45,19.9 15.45,19.5 17.5,19.5C19.3,19.5 21,19.8 22.5,20.5V6.5C21,5.4 18.9,5 17.5,5C15.45,5 13.45,5.4 12,6.5C10.55,5.4 8.55,5 6.5,5C4.55,5 2.45,5.4 1,6.5V21C2.45,19.9 4.55,19.5 6.5,19.5C8.55,19.5 10.55,19.9 12,21Z" fill="#5D4037"/></svg>""",
-    "Holy": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M18,2H6V4L10,8.5V18H8V20H16V18H14V8.5L18,4V2Z" fill="#C0C0C0" stroke="#707070" stroke-width="1.5"/></svg>""",
-    "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
+    "War": f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M18.3,5.7L12,12L13.4,13.4L19.7,7.1L18.3,5.7M5.7,5.7L7.1,4.3L13.4,10.6L12,12L5.7,5.7M12,12L18.3,18.3L16.9,19.7L10.6,13.4L12,12M12,12L5.7,18.3L4.3,16.9L10.6,10.6L12,12Z" fill="#800"/></svg>',
+    "Noble": f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><circle cx="12" cy="12" r="8" fill="none" stroke="#D4AF37" stroke-width="2"/><circle cx="12" cy="5" r="2.5" fill="#D4AF37"/></svg>',
+    "Learned": f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,21C13.45,19.9 15.45,19.5 17.5,19.5C19.3,19.5 21,19.8 22.5,20.5V6.5C21,5.4 18.9,5 17.5,5C15.45,5 13.45,5.4 12,6.5C10.55,5.4 8.55,5 6.5,5C4.55,5 2.45,5.4 1,6.5V21C2.45,19.9 4.55,19.5 6.5,19.5C8.55,19.5 10.55,19.9 12,21Z" fill="#5D4037"/></svg>',
+    "Holy": f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M18,2H6V4L10,8.5V18H8V20H16V18H14V8.5L18,4V2Z" fill="#C0C0C0" stroke="#707070" stroke-width="1.5"/></svg>',
+    "Shadow": f'<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>'
 }
 
 # --- 5. SIDEBAR FILTRI AVANZATI ---
@@ -221,16 +212,18 @@ with c_deck:
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
 
-    # --- 8. IMPORT / EXPORT TXT (ID | QTY | NOME) ---
+    # --- 8. IMPORT / EXPORT POTENZIATO ---
     st.divider()
     exp1, exp2 = st.columns(2)
     
-    # Costruzione file TXT
+    # Generazione TXT
     txt_content = f"HOUSE: {st.session_state.house_choice}\nAGENDA: {st.session_state.agenda_choice}\n"
     txt_content += "-"*30 + "\n"
     for cid, qty in st.session_state.deck.items():
-        c_name = df[df['id_str'] == cid]['name'].values[0]
-        txt_content += f"{cid} | {qty} | {c_name}\n"
+        try:
+            c_name = df[df['id_str'] == cid]['name'].values[0]
+            txt_content += f"{cid} | {qty} | {c_name}\n"
+        except: continue
     
     exp1.download_button("💾 SALVA TXT", txt_content, "mazzo.txt", use_container_width=True)
     
@@ -243,19 +236,28 @@ with c_deck:
                 data = json.loads(content)
                 raw_deck = data.get("Deck", {})
                 for k, v in raw_deck.items():
-                    match = df[(df['id_str'] == str(k)) | (df['name'] == str(k))]
+                    match = df[(df['id_str'] == str(k).strip()) | (df['name'] == str(k).strip())]
                     if not match.empty: new_deck[match.iloc[0]['id_str']] = v
                 st.session_state.house_choice = data.get("House", "Stark")
                 st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
             else:
                 for line in content.splitlines():
-                    if "HOUSE:" in line: st.session_state.house_choice = line.split(":")[1].strip()
-                    elif "AGENDA:" in line: st.session_state.agenda_choice = line.split(":")[1].strip()
+                    line = line.strip()
+                    if not line or "---" in line: continue
+                    if "HOUSE:" in line: st.session_state.house_choice = line.split("HOUSE:")[1].strip()
+                    elif "AGENDA:" in line: st.session_state.agenda_choice = line.split("AGENDA:")[1].strip()
                     elif "|" in line:
-                        parts = line.split("|")
+                        parts = [p.strip() for p in line.split("|")]
                         if len(parts) >= 2:
-                            cid = parts[0].strip()
-                            if cid in df['id_str'].values: new_deck[cid] = int(parts[1].strip())
+                            # Cerca prima per ID esatto (parts[0]), poi per nome (parts[0] o parts[2])
+                            id_to_find = parts[0]
+                            name_to_find = parts[2] if len(parts) > 2 else parts[0]
+                            qty = int(parts[1])
+                            
+                            match = df[(df['id_str'] == id_to_find) | (df['name'] == id_to_find) | (df['name'] == name_to_find)]
+                            if not match.empty:
+                                real_id = match.iloc[0]['id_str']
+                                new_deck[real_id] = new_deck.get(real_id, 0) + qty
             st.session_state.deck = new_deck
             st.rerun()
-        except: st.error("Errore nel file.")
+        except Exception as e: st.error(f"Errore caricamento: {e}")
