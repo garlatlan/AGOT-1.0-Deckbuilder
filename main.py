@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE E STILE ---
+# --- 1. CONFIGURAZIONE E STILE (Invariato) ---
 st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
@@ -212,7 +212,7 @@ with c_deck:
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
 
-    # --- 8. IMPORT / EXPORT POTENZIATO ---
+    # --- 8. IMPORT / EXPORT (SOLO TRAMITE ID) ---
     st.divider()
     exp1, exp2 = st.columns(2)
     
@@ -236,7 +236,8 @@ with c_deck:
                 data = json.loads(content)
                 raw_deck = data.get("Deck", {})
                 for k, v in raw_deck.items():
-                    match = df[(df['id_str'] == str(k).strip()) | (df['name'] == str(k).strip())]
+                    # Nel JSON l'ID è la chiave. Cerchiamo ESCLUSIVAMENTE per ID.
+                    match = df[df['id_str'] == str(k).strip()]
                     if not match.empty: new_deck[match.iloc[0]['id_str']] = v
                 st.session_state.house_choice = data.get("House", "Stark")
                 st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
@@ -249,12 +250,10 @@ with c_deck:
                     elif "|" in line:
                         parts = [p.strip() for p in line.split("|")]
                         if len(parts) >= 2:
-                            # Cerca prima per ID esatto (parts[0]), poi per nome (parts[0] o parts[2])
+                            # Cerchiamo ESCLUSIVAMENTE tramite ID (parts[0])
                             id_to_find = parts[0]
-                            name_to_find = parts[2] if len(parts) > 2 else parts[0]
                             qty = int(parts[1])
-                            
-                            match = df[(df['id_str'] == id_to_find) | (df['name'] == id_to_find) | (df['name'] == name_to_find)]
+                            match = df[df['id_str'] == id_to_find]
                             if not match.empty:
                                 real_id = match.iloc[0]['id_str']
                                 new_deck[real_id] = new_deck.get(real_id, 0) + qty
