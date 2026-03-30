@@ -10,7 +10,6 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
     .stMarkdown, p, label { font-size: 14px !important; }
     
-    /* Pulsante AGGIUNGI (Sinistra) - Standard */
     .stButton>button { border-radius: 4px; }
 
     /* COMPATTEZZA SELETTIVA SOLO PER LA COLONNA DECK (Destra) */
@@ -41,7 +40,6 @@ st.markdown("""
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
     .svg-text { position: absolute; font-weight: bold; font-family: sans-serif; z-index: 2; text-align: center; }
 
-    /* LOGICA MOUSEOVER */
     .card-hover-container { position: relative; display: inline-block; width: 100%; cursor: help; }
     .card-hover-image {
         display: none; position: fixed; left: 30px; top: 60px; z-index: 999999 !important;
@@ -159,36 +157,23 @@ if not df.empty:
 # --- 6. FUNZIONE RENDER RIGA ---
 def render_card_row(row, key_prefix):
     cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
-    # 1. Costo
     with cols[0]:
         if row['card_type'] not in ['House', 'Agenda', 'Plot']:
             st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:13px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
         elif row['card_type'] == 'Plot':
             st.write(f"({row['income']})")
-    # 2. Nome
     with cols[1]:
         img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
         hover_html = f'<div class="card-hover-container"><span class="card-name-text">{row["name"]}</span><img class="card-hover-image" src="{img_hover_url}" width="300"></div>'
         st.markdown(hover_html, unsafe_allow_html=True)
-    # 3. Forza
     with cols[2]:
         if row['card_type'] == 'Character':
             st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
-    # 4. Icone (Slot Fissi) + Creste (Separato)
     with cols[3]:
-        ic_html = f"""
-        <div style="display:flex; align-items:center;">
-            <div style="display:flex; gap:2px; width:65px;">
-                <div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div>
-                <div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div>
-                <div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div>
-            </div>
-            <div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">
-        """
+        ic_html = f"""<div style="display:flex; align-items:center;"><div style="display:flex; gap:2px; width:65px;"><div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div></div><div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">"""
         for cr in row['crest_list']: ic_html += f'<div style="width:19px; height:19px;">{CREST_ICONS.get(cr, "")}</div>'
         ic_html += '</div></div>'
         st.markdown(ic_html, unsafe_allow_html=True)
-    # 5. Bottone
     return cols[4]
 
 # --- 7. LAYOUT PRINCIPALE ---
@@ -197,7 +182,7 @@ c_list, c_deck = st.columns([2.5, 2.5])
 with c_list:
     st.subheader(f"🗃️ Risultati ({len(filtered)})")
     st.divider()
-    with st.container(height=750):
+    with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list")
             if btn_col.button("➕", key=f"add_{row['id']}"):
@@ -216,8 +201,9 @@ with c_deck:
         st.session_state.agenda_choice = st.selectbox("Agenda", agendas, index=agendas.index(st.session_state.agenda_choice) if st.session_state.agenda_choice in agendas else 0)
     
     m_count, p_count = 0, 0
-    with st.container(height=650):
-        deck_cards = []
+    deck_cards = []
+    
+    with st.container(height=550):
         for name, qty in st.session_state.deck.items():
             matches = df[df['name'] == name]
             if not matches.empty:
@@ -225,22 +211,20 @@ with c_deck:
                 c_data['qty'] = qty
                 deck_cards.append(c_data)
         
-        categories = {
-            "PLOT": [c for c in deck_cards if c['card_type'] == 'Plot'],
-            "PERSONAGGI UNICI": [c for c in deck_cards if c['card_type'] == 'Character' and c['is_unique']],
-            "PERSONAGGI NON UNICI": [c for c in deck_cards if c['card_type'] == 'Character' and not c['is_unique']],
-            "LUOGHI": [c for c in deck_cards if c['card_type'] == 'Location'],
-            "ATTACHMENT": [c for c in deck_cards if c['card_type'] == 'Attachment'],
-            "EVENTI": [c for c in deck_cards if c['card_type'] == 'Event']
-        }
-
-        for label, cards in categories.items():
-            if cards:
-                st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in cards)})</div>', unsafe_allow_html=True)
-                for row in sorted(cards, key=lambda x: x['cost'], reverse=True):
+        categories = {"PLOT": "Plot", "PERSONAGGI UNICI": "Character_U", "PERSONAGGI NON UNICI": "Character_NU", "LUOGHI": "Location", "ATTACHMENT": "Attachment", "EVENTI": "Event"}
+        
+        for label, c_type in categories.items():
+            subset = []
+            if c_type == "Character_U": subset = [c for c in deck_cards if c['card_type'] == 'Character' and c['is_unique']]
+            elif c_type == "Character_NU": subset = [c for c in deck_cards if c['card_type'] == 'Character' and not c['is_unique']]
+            else: subset = [c for c in deck_cards if c['card_type'] == c_type]
+            
+            if subset:
+                st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
+                for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
                     btn_col = render_card_row(row, "deck")
                     with btn_col:
-                        if st.button(f"x{row['qty']}", key=f"rm_{row['name']}", help="Rimuovi 1"):
+                        if st.button(f"x{row['qty']}", key=f"rm_{row['name']}"):
                             if row['qty'] > 1: st.session_state.deck[row['name']] -= 1
                             else: del st.session_state.deck[row['name']]
                             st.rerun()
@@ -248,14 +232,30 @@ with c_deck:
                     else: m_count += row['qty']
                     st.markdown('<hr>', unsafe_allow_html=True)
 
+    # --- 8. STATISTICHE ---
     st.divider()
     s1, s2 = st.columns(2)
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
     
-    export_data = {
-        "House": st.session_state.house_choice,
-        "Agenda": st.session_state.agenda_choice,
-        "Deck": st.session_state.deck
-    }
+    if deck_cards:
+        st.write("📊 **Curve del Costo**")
+        col_curve1, col_curve2 = st.columns(2)
+        
+        def get_curve(ctype):
+            data = [c for c in deck_cards if c['card_type'] == ctype]
+            counts = {i: 0 for i in range(6)} # 0 to 5+
+            for c in data:
+                cost = min(c['cost'], 5)
+                counts[cost] += c['qty']
+            return pd.Series(counts)
+
+        with col_curve1:
+            st.caption("Personaggi")
+            st.bar_chart(get_curve('Character'), height=150)
+        with col_curve2:
+            st.caption("Luoghi")
+            st.bar_chart(get_curve('Location'), height=150)
+
+    export_data = {"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck}
     st.download_button("💾 SALVA JSON", json.dumps(export_data), "mazzo.json", use_container_width=True)
