@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import pandas as pd
 
-# --- 1. CONFIGURAZIONE ---
+# --- 1. CONFIGURAZIONE E STILE ---
 st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
@@ -11,7 +11,7 @@ st.markdown("""
     .stMarkdown, p, label { font-size: 14px !important; }
     .stButton>button { border-radius: 4px; }
 
-    /* COMPATTEZZA SELETTIVA COLONNA DECK */
+    /* Compattazione colonna Deck */
     [data-testid="column"]:nth-child(2) .stElementContainer { margin-bottom: -0.85rem !important; }
     [data-testid="column"]:nth-child(2) .stButton>button {
         padding: 0px 2px !important;
@@ -43,7 +43,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. SESSION STATE ---
-if 'deck' not in st.session_state: st.session_state.deck = {} # Chiave: ID della carta, Valore: Qty
+if 'deck' not in st.session_state: st.session_state.deck = {} 
 if 'house_choice' not in st.session_state: st.session_state.house_choice = "Stark"
 if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Nessuna Agenda"
 
@@ -58,7 +58,7 @@ def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
-        df['id_str'] = df['id'].astype(str).str.strip() # ID normalizzato per il mazzo
+        df['id_str'] = df['id'].astype(str).str.strip()
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
@@ -66,16 +66,13 @@ def load_data():
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         df['is_unique'] = df['name'].str.contains(r'^\*') | df.get('unique', False)
-        all_crests = set()
-        for sublist in df['crest_list']:
-            for c in sublist:
-                if c: all_crests.add(c)
+        all_crests = {c for sublist in df['crest_list'] for c in sublist if c}
         return df, sorted(list(all_crests))
     except: return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
-# --- 4. ICONE SVG ---
+# --- 4. ICONE E CRESTE SVG ---
 SVG_COIN = """<svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="14" fill="#D4AF37" stroke="#996515" stroke-width="2"/><circle cx="16" cy="16" r="11" fill="none" stroke="#996515" stroke-width="1" stroke-dasharray="2,2"/></svg>"""
 SVG_SHIELD = """<svg viewBox="0 0 32 32" width="28" height="28"><path d="M16 2 L28 7 V15 C28 22 16 28 16 28 C16 28 4 22 4 15 V7 L16 2 Z" fill="#71797E" stroke="#333" stroke-width="2"/></svg>"""
 ICON_SIZE = 19
@@ -91,9 +88,9 @@ CREST_ICONS = {
     "Shadow": f"""<svg viewBox="0 0 24 24" width="{ICON_SIZE}" height="{ICON_SIZE}"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5C9.3,16.5 8,15.2 8,13.5H9.5A1.5,1.5 0 0,1 11,15A1.5,1.5 0 0,1 12.5,13.5A1.5,1.5 0 0,1 11,12C9.3,12 8,10.7 8,9A3,3 0 0,1 11,6A3,3 0 0,1 14,9H12.5A1.5,1.5 0 0,1 11,7.5A1.5,1.5 0 0,1 9.5,9A1.5,1.5 0 0,1 11,10.5A3,3 0 0,1 14,13.5A3,3 0 0,1 11,16.5Z" fill="#4A148C"/></svg>"""
 }
 
-# --- 5. SIDEBAR FILTRI ---
+# --- 5. SIDEBAR FILTRI AVANZATI ---
 st.sidebar.title("🔍 FILTRI")
-if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True, type="secondary"):
+if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True):
     reset_filters(); st.rerun()
 
 if not df.empty:
@@ -104,7 +101,6 @@ if not df.empty:
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()), key="f_house")
         f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()), key="f_type")
 
-    # (Filtri numerici, icone e creste rimangono identici per funzionalità)
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter(label, key):
             st.write(f"**{label}**")
@@ -118,11 +114,13 @@ if not df.empty:
         with cr: a_str, o_str, v_str = num_filter("Forza", "s"); a_inf, o_inf, v_inf = num_filter("Influ.", "f")
 
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=True):
+        st.write("**Icone**")
         i_cols = st.columns(3)
         with i_cols[0]: f_mil = st.checkbox("MIL", key="f_mil"); st.markdown(SVG_MIL, unsafe_allow_html=True)
         with i_cols[1]: f_int = st.checkbox("INT", key="f_int"); st.markdown(SVG_INT, unsafe_allow_html=True)
         with i_cols[2]: f_pow = st.checkbox("POW", key="f_pow"); st.markdown(SVG_POW, unsafe_allow_html=True)
         st.write("---")
+        st.write("**Creste**")
         sel_crests = []
         c_cols = st.columns(2)
         for idx, c_name in enumerate(available_crests):
@@ -149,8 +147,8 @@ if not df.empty:
     if f_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
     for c in sel_crests: filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. FUNZIONI RENDERING ---
-def render_card_row(row, key_prefix):
+# --- 6. RENDERING CARTE ---
+def render_card_row(row, i):
     cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
     with cols[0]:
         if row['card_type'] not in ['House', 'Agenda', 'Plot']:
@@ -162,23 +160,21 @@ def render_card_row(row, key_prefix):
     with cols[2]:
         if row['card_type'] == 'Character': st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
     with cols[3]:
-        ic_html = f"""<div style="display:flex; align-items:center;"><div style="display:flex; gap:2px; width:65px;"><div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div></div><div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">"""
-        for cr in row['crest_list']: ic_html += f'<div style="width:19px; height:19px;">{CREST_ICONS.get(cr, "")}</div>'
+        ic_html = f"""<div style="display:flex; align-items:center;"><div style="display:flex; gap:2px; width:65px;"><div style="width:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div><div style="width:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div><div style="width:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div></div><div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">"""
+        for cr in row['crest_list']: ic_html += f'<div style="width:19px;">{CREST_ICONS.get(cr, "")}</div>'
         st.markdown(ic_html + '</div></div>', unsafe_allow_html=True)
     return cols[4]
 
-# --- 7. LAYOUT PRINCIPALE ---
+# --- 7. MAIN LAYOUT ---
 c_list, c_deck = st.columns([2.5, 2.5])
 
 with c_list:
-    st.subheader(f"🗃️ Risultati ({len(filtered)})")
-    st.divider()
+    st.subheader(f"🗃️ Libreria ({len(filtered)})")
     with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
-            btn_col = render_card_row(row, "list")
-            if btn_col.button("➕", key=f"add_{row['id_str']}"):
-                st.session_state.deck[row['id_str']] = st.session_state.deck.get(row['id_str'], 0) + 1
-                st.rerun()
+            btn_col = render_card_row(row, i)
+            if btn_col.button("➕", key=f"add_{row['id_str']}_{i}"):
+                st.session_state.deck[row['id_str']] = st.session_state.deck.get(row['id_str'], 0) + 1; st.rerun()
             st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_deck:
@@ -196,23 +192,22 @@ with c_deck:
         st.session_state.agenda_choice = st.selectbox("Agenda", agendas, index=agendas.index(st.session_state.agenda_choice) if st.session_state.agenda_choice in agendas else 0)
     
     m_count, p_count, deck_cards = 0, 0, []
-    with st.container(height=500):
+    with st.container(height=550):
         for cid, qty in st.session_state.deck.items():
-            matches = df[df['id_str'] == cid]
-            if not matches.empty:
-                c_data = matches.iloc[0].to_dict(); c_data['qty'] = qty; deck_cards.append(c_data)
-
-        categories = {"PLOT": "Plot", "PERSONAGGI UNICI": "Character_U", "PERSONAGGI NON UNICI": "Character_NU", "LUOGHI": "Location", "ATTACHMENT": "Attachment", "EVENTI": "Event"}
+            card = df[df['id_str'] == cid]
+            if not card.empty:
+                c_data = card.iloc[0].to_dict(); c_data['qty'] = qty; deck_cards.append(c_data)
+        
+        categories = {"PLOT": "Plot", "PERSONAGGI UNICI": "Char_U", "PERSONAGGI NON UNICI": "Char_NU", "LUOGHI": "Location", "ATTACHMENT": "Attachment", "EVENTI": "Event"}
         for label, c_type in categories.items():
-            if "Character" in c_type:
-                subset = [c for c in deck_cards if c['card_type'] == 'Character' and (c['is_unique'] if c_type=="Character_U" else not c['is_unique'])]
-            else:
-                subset = [c for c in deck_cards if c['card_type'] == c_type]
+            if c_type == "Char_U": subset = [c for c in deck_cards if c['card_type'] == 'Character' and c['is_unique']]
+            elif c_type == "Char_NU": subset = [c for c in deck_cards if c['card_type'] == 'Character' and not c['is_unique']]
+            else: subset = [c for c in deck_cards if c['card_type'] == c_type]
             
             if subset:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
-                for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
-                    btn_col = render_card_row(row, "deck")
+                for i, row in enumerate(sorted(subset, key=lambda x: x['cost'], reverse=True)):
+                    btn_col = render_card_row(row, f"d_{i}")
                     if btn_col.button(f"x{row['qty']}", key=f"rm_{row['id_str']}"):
                         if row['qty'] > 1: st.session_state.deck[row['id_str']] -= 1
                         else: del st.session_state.deck[row['id_str']]
@@ -225,41 +220,42 @@ with c_deck:
     s1, s2 = st.columns(2)
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
-    
-    # --- 8. IMPORT / EXPORT (SISTEMA TXT) ---
+
+    # --- 8. IMPORT / EXPORT TXT (ID | QTY | NOME) ---
     st.divider()
-    exp_col1, exp_col2 = st.columns(2)
+    exp1, exp2 = st.columns(2)
     
     # Costruzione file TXT
-    # Formato: 
-    # HOUSE: [Casata]
-    # AGENDA: [Agenda]
-    # ID | QTY | NAME
     txt_content = f"HOUSE: {st.session_state.house_choice}\nAGENDA: {st.session_state.agenda_choice}\n"
     txt_content += "-"*30 + "\n"
     for cid, qty in st.session_state.deck.items():
         c_name = df[df['id_str'] == cid]['name'].values[0]
         txt_content += f"{cid} | {qty} | {c_name}\n"
     
-    exp_col1.download_button("💾 SALVA TXT", txt_content, "mazzo.txt", use_container_width=True)
+    exp1.download_button("💾 SALVA TXT", txt_content, "mazzo.txt", use_container_width=True)
     
-    uploaded_file = exp_col2.file_uploader("📂 CARICA TXT", type="txt", label_visibility="collapsed")
-    if uploaded_file is not None:
+    up = exp2.file_uploader("Carica TXT/JSON", type=["txt", "json"], label_visibility="collapsed")
+    if up and st.button("✅ CONFERMA IMPORT", use_container_width=True):
         try:
             new_deck = {}
-            lines = uploaded_file.getvalue().decode("utf-8").splitlines()
-            for line in lines:
-                if line.startswith("HOUSE:"): st.session_state.house_choice = line.replace("HOUSE:", "").strip()
-                elif line.startswith("AGENDA:"): st.session_state.agenda_choice = line.replace("AGENDA:", "").strip()
-                elif "|" in line:
-                    parts = line.split("|")
-                    if len(parts) >= 2:
-                        card_id = parts[0].strip()
-                        card_qty = int(parts[1].strip())
-                        # Verifica che l'ID esista nel database corrente
-                        if card_id in df['id_str'].values:
-                            new_deck[card_id] = card_qty
+            content = up.getvalue().decode("utf-8")
+            if up.name.endswith(".json"):
+                data = json.loads(content)
+                raw_deck = data.get("Deck", {})
+                for k, v in raw_deck.items():
+                    match = df[(df['id_str'] == str(k)) | (df['name'] == str(k))]
+                    if not match.empty: new_deck[match.iloc[0]['id_str']] = v
+                st.session_state.house_choice = data.get("House", "Stark")
+                st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
+            else:
+                for line in content.splitlines():
+                    if "HOUSE:" in line: st.session_state.house_choice = line.split(":")[1].strip()
+                    elif "AGENDA:" in line: st.session_state.agenda_choice = line.split(":")[1].strip()
+                    elif "|" in line:
+                        parts = line.split("|")
+                        if len(parts) >= 2:
+                            cid = parts[0].strip()
+                            if cid in df['id_str'].values: new_deck[cid] = int(parts[1].strip())
             st.session_state.deck = new_deck
             st.rerun()
-        except Exception as e:
-            st.error(f"Errore nel caricamento del file TXT: {e}")
+        except: st.error("Errore nel file.")
