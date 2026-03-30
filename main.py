@@ -1,8 +1,11 @@
 import streamlit as st
 import json
 import pandas as pd
+from fpdf import FPDF
+import requests
+from io import BytesIO
 
-# --- 1. CONFIGURAZIONE E STILE (Invariato) ---
+# --- 1. CONFIGURAZIONE E STILE ---
 st.set_page_config(page_title="AGoT 1.0 Deckbuilder Pro", layout="wide")
 
 st.markdown("""
@@ -138,7 +141,109 @@ if not df.empty:
     if f_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
     for c in sel_crests: filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. RENDERING CARTE ---
+# --- 6. FUNZIONE GENERAZIONE PDF PROXY ---
+def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=10)
+    
+    # Parametri carte
+    c_w, c_h = 63, 88
+    margin_cut = 0.5
+    gap = 2
+    start_x, start_y = 10, 10
+    
+    # 1. Preparazione lista immagini (inclusi House e Agenda)
+    proxy_list = []
+    
+    # Aggiungi House Card
+    h_card = df_all[df_all['name'] == house_name]
+    if not h_card.empty: proxy_list.append(h_card.iloc[0]['preview_image_url'])
+    
+    # Aggiungi Agenda Card
+    if agenda_name != "Nessuna Agenda":
+        a_card = df_all[df_all['name'] == agenda_name]
+        if not a_card.empty: proxy_list.append(a_card.iloc[0]['preview_image_url'])
+        
+    # Aggiungi carte del mazzo
+    for cid, qty in deck_dict.items():
+        card_row = df_all[df_all['id_str'] == cid]
+        if not card_row.empty:
+            img_url = card_row.iloc[0]['preview_image_url']
+            for _ in range(qty): proxy_list.append(img_url)
+
+    # 2. Generazione Pagine Carte
+    col, row = 0, 0
+    pdf.add_page()
+    
+    progress_bar = st.progress(0)
+    for i, img_path in enumerate(proxy_list):
+        full_url = f"https://agot-lcg-search.pages.dev{img_path}"
+        try:
+            response = requests.get(full_url)
+            img_data = BytesIO(response.content)
+            
+            x = start_x + (col * (c_w + gap))
+            y = start_y + (row * (c_h + gap))
+            
+            # Disegna rettangolo di taglio (0.5mm più grande della carta)
+            pdf.set_draw_color(200, 200, 200) # Grigio chiaro per il taglio
+            pdf.rect(x - margin_cut, y - margin_cut, c_w + (margin_cut*2), c_h + (margin_cut*2))
+            
+            # Inserisci immagine carta
+            pdf.image(img_data, x=x, y=y, w=c_w, h=c_h)
+            
+            col += 1
+            if col > 2:
+                col = 0
+                row += 1
+            if row > 2 and i < len(proxy_list) - 1:
+                pdf.add_page()
+                row = 0
+                col = 0
+        except: continue
+        progress_bar.progress((i + 1) / len(proxy_list))
+    
+    # 3. Pagina Finale: Decklist Testuale
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, f"DECKLIST: {house_name}", ln=True, align='C')
+    pdf.set_font("Helvetica", "I", 12)
+    pdf.cell(0, 8, f"Agenda: {agenda_name}", ln=True, align='C')
+    pdf.ln(5)
+
+    # Raccolta dati per la lista
+    deck_cards = []
+    for cid, qty in deck_dict.items():
+        c = df_all[df_all['id_str'] == cid]
+        if not c.empty:
+            c_data = c.iloc[0].to_dict()
+            c_data['qty'] = qty
+            deck_cards.append(c_data)
+
+    cat_map = [
+        ("PLOT", lambda x: x['card_type'] == 'Plot'),
+        ("PERSONAGGI UNICI", lambda x: x['card_type'] == 'Character' and x['is_unique']),
+        ("PERSONAGGI NON UNICI", lambda x: x['card_type'] == 'Character' and not x['is_unique']),
+        ("LUOGHI", lambda x: x['card_type'] == 'Location'),
+        ("ATTACHMENT", lambda x: x['card_type'] == 'Attachment'),
+        ("EVENTI", lambda x: x['card_type'] == 'Event')
+    ]
+
+    for label, cond in cat_map:
+        subset = [c for c in deck_cards if cond(c)]
+        if subset:
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_fill_color(240, 240, 240)
+            pdf.cell(0, 6, f" {label} ({sum(c['qty'] for c in subset)})", ln=True, fill=True)
+            pdf.set_font("Helvetica", "", 10)
+            for c in sorted(subset, key=lambda x: x['name']):
+                set_name = c.get('set_name', c['id_str'].split('_')[0].upper())
+                pdf.cell(0, 5, f" {c['qty']}x {c['name']} ({set_name})", ln=True)
+
+    return pdf.output()
+
+# --- 7. RENDERING CARTE ---
 def render_card_row(row, i):
     cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
     with cols[0]:
@@ -156,7 +261,7 @@ def render_card_row(row, i):
         st.markdown(ic_html + '</div></div>', unsafe_allow_html=True)
     return cols[4]
 
-# --- 7. MAIN LAYOUT ---
+# --- 8. MAIN LAYOUT ---
 c_list, c_deck = st.columns([2.5, 2.5])
 
 with c_list:
@@ -212,9 +317,9 @@ with c_deck:
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
 
-    # --- 8. IMPORT / EXPORT (SOLO TRAMITE ID) ---
+    # --- 9. IMPORT / EXPORT / PRINT ---
     st.divider()
-    exp1, exp2 = st.columns(2)
+    exp1, exp2, exp3 = st.columns(3)
     
     # Generazione TXT
     txt_content = f"HOUSE: {st.session_state.house_choice}\nAGENDA: {st.session_state.agenda_choice}\n"
@@ -236,7 +341,6 @@ with c_deck:
                 data = json.loads(content)
                 raw_deck = data.get("Deck", {})
                 for k, v in raw_deck.items():
-                    # Nel JSON l'ID è la chiave. Cerchiamo ESCLUSIVAMENTE per ID.
                     match = df[df['id_str'] == str(k).strip()]
                     if not match.empty: new_deck[match.iloc[0]['id_str']] = v
                 st.session_state.house_choice = data.get("House", "Stark")
@@ -250,7 +354,6 @@ with c_deck:
                     elif "|" in line:
                         parts = [p.strip() for p in line.split("|")]
                         if len(parts) >= 2:
-                            # Cerchiamo ESCLUSIVAMENTE tramite ID (parts[0])
                             id_to_find = parts[0]
                             qty = int(parts[1])
                             match = df[df['id_str'] == id_to_find]
@@ -259,4 +362,13 @@ with c_deck:
                                 new_deck[real_id] = new_deck.get(real_id, 0) + qty
             st.session_state.deck = new_deck
             st.rerun()
-        except Exception as e: st.error(f"Errore caricamento: {e}")
+        except Exception as e: st.error(f"Errore: {e}")
+
+    # TASTO STAMPA PDF
+    if st.session_state.deck:
+        if exp3.button("🖨️ GENERA PROXY PDF", use_container_width=True):
+            with st.spinner("Generazione PDF in corso..."):
+                pdf_data = create_proxy_pdf(st.session_state.deck, st.session_state.house_choice, st.session_state.agenda_choice, df)
+                st.download_button("⬇️ SCARICA PDF", data=pdf_data, file_name="proxy_deck.pdf", mime="application/pdf", use_container_width=True)
+    else:
+        exp3.button("🖨️ MAZZO VUOTO", disabled=True, use_container_width=True)
