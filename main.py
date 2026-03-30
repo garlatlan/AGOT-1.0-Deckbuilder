@@ -146,7 +146,6 @@ def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=True, margin=10)
     
-    # Parametri carte
     c_w, c_h = 63, 88
     margin_cut = 0.5
     gap = 2
@@ -154,22 +153,18 @@ def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
     
     proxy_list = []
     
-    # Aggiungi House Card
     h_card = df_all[df_all['name'] == house_name]
     if not h_card.empty: proxy_list.append(h_card.iloc[0].to_dict())
     
-    # Aggiungi Agenda Card
     if agenda_name != "Nessuna Agenda":
         a_card = df_all[df_all['name'] == agenda_name]
         if not a_card.empty: proxy_list.append(a_card.iloc[0].to_dict())
         
-    # Aggiungi carte del mazzo (ripetute per QTY)
     for cid, qty in deck_dict.items():
         card_row = df_all[df_all['id_str'] == cid]
         if not card_row.empty:
             for _ in range(qty): proxy_list.append(card_row.iloc[0].to_dict())
 
-    # Generazione Pagine Carte
     col, row = 0, 0
     pdf.add_page()
     
@@ -180,13 +175,12 @@ def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
         full_url = f"https://agot-lcg-search.pages.dev{c_data['preview_image_url']}"
         try:
             response = requests.get(full_url, timeout=10)
-            response.raise_for_status() # Se fallisce, va in except
+            response.raise_for_status() 
             img_data = BytesIO(response.content)
             
             x = start_x + (col * (c_w + gap))
             y = start_y + (row * (c_h + gap))
             
-            # Margine di taglio grigio chiaro
             pdf.set_draw_color(200, 200, 200)
             pdf.rect(x - margin_cut, y - margin_cut, c_w + (margin_cut*2), c_h + (margin_cut*2))
             
@@ -201,12 +195,10 @@ def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
                 row = 0
                 col = 0
         except Exception as e:
-            # INTERRUZIONE CRITICA: Se una carta manca, fermiamo tutto.
             raise Exception(f"ERRORE CRITICO: Impossibile scaricare '{c_data['name']}'. Il PDF non sarà generato. Errore: {e}")
             
         progress_bar.progress((i + 1) / total_images)
     
-    # Pagina Finale: Decklist Testuale
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, f"DECKLIST: {house_name}", ln=True, align='C')
@@ -244,8 +236,8 @@ def create_proxy_pdf(deck_dict, house_name, agenda_name, df_all):
                 line = f" {c['qty']}x {c['name']} ({set_name})"
                 pdf.cell(0, 5, line.encode('latin-1', 'replace').decode('latin-1'), ln=True)
 
-    # Ritorna bytes codificati correttamente
-    return pdf.output(dest='S').encode('latin-1')
+    # CORREZIONE: pdf.output() nelle ultime versioni restituisce bytes (o bytearray)
+    return pdf.output()
 
 # --- 7. RENDERING CARTE ---
 def render_card_row(row, i):
@@ -321,11 +313,9 @@ with c_deck:
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
 
-    # --- 9. IMPORT / EXPORT / PRINT ---
     st.divider()
     exp1, exp2, exp3 = st.columns(3)
     
-    # Generazione TXT (Export)
     txt_content = f"HOUSE: {st.session_state.house_choice}\nAGENDA: {st.session_state.agenda_choice}\n"
     txt_content += "-"*30 + "\n"
     for cid, qty in st.session_state.deck.items():
@@ -335,7 +325,6 @@ with c_deck:
         except: continue
     exp1.download_button("💾 SALVA TXT", txt_content, "mazzo.txt", use_container_width=True)
     
-    # Import TXT (ID Only)
     up = exp2.file_uploader("Carica TXT", type=["txt"], label_visibility="collapsed")
     if up and st.button("✅ CONFERMA IMPORT", use_container_width=True):
         new_deck = {}
@@ -354,15 +343,16 @@ with c_deck:
         st.session_state.deck = new_deck
         st.rerun()
 
-    # TASTO STAMPA PDF (Corretto)
+    # TASTO STAMPA PDF (Corretto per bytearray)
     if st.session_state.deck:
-        if exp3.button("🖨️ GENERA PROXY PDF", use_container_width=True):
+        if exp3.button("🖨️ GENERA PROXY PDF", key="btn_pdf", use_container_width=True):
             with st.spinner("Creazione PDF..."):
                 try:
-                    pdf_bytes = create_proxy_pdf(st.session_state.deck, st.session_state.house_choice, st.session_state.agenda_choice, df)
+                    # Otteniamo i dati (saranno bytearray o bytes)
+                    pdf_data = create_proxy_pdf(st.session_state.deck, st.session_state.house_choice, st.session_state.agenda_choice, df)
                     st.download_button(
                         label="⬇️ SCARICA PDF",
-                        data=pdf_bytes,
+                        data=bytes(pdf_data), # Convertiamo esplicitamente in bytes per evitare errori
                         file_name="proxy_deck.pdf",
                         mime="application/pdf",
                         use_container_width=True
