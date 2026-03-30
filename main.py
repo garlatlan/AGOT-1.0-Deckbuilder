@@ -43,12 +43,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. SESSION STATE ---
-if 'deck' not in st.session_state: st.session_state.deck = {}
+if 'deck' not in st.session_state: st.session_state.deck = {} # Chiave sarà l'ID (stringa)
 if 'house_choice' not in st.session_state: st.session_state.house_choice = "Stark"
 if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Nessuna Agenda"
 
 def reset_filters():
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         if key.startswith(('f_', 'a_', 'o_', 'v_', 'cr_')):
             del st.session_state[key]
 
@@ -58,6 +58,7 @@ def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
+        df['id_str'] = df['id'].astype(str) # ID come stringa per coerenza con JSON
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
@@ -177,8 +178,8 @@ with c_list:
     with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list")
-            if btn_col.button("➕", key=f"add_{row['id']}"):
-                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
+            if btn_col.button("➕", key=f"add_{row['id_str']}"):
+                st.session_state.deck[row['id_str']] = st.session_state.deck.get(row['id_str'], 0) + 1
                 st.rerun()
             st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -199,8 +200,8 @@ with c_deck:
     
     m_count, p_count, deck_cards = 0, 0, []
     with st.container(height=500):
-        for name, qty in st.session_state.deck.items():
-            matches = df[df['name'] == name]
+        for cid, qty in st.session_state.deck.items():
+            matches = df[df['id_str'] == cid]
             if not matches.empty:
                 c_data = matches.iloc[0].to_dict()
                 c_data['qty'] = qty
@@ -212,9 +213,9 @@ with c_deck:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
                 for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
                     btn_col = render_card_row(row, "deck")
-                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['name']}"):
-                        if row['qty'] > 1: st.session_state.deck[row['name']] -= 1
-                        else: del st.session_state.deck[row['name']]
+                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['id_str']}"):
+                        if row['qty'] > 1: st.session_state.deck[row['id_str']] -= 1
+                        else: del st.session_state.deck[row['id_str']]
                         st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
@@ -242,8 +243,10 @@ with c_deck:
     
     uploaded_file = exp_col2.file_uploader("📂 CARICA JSON", type="json", label_visibility="collapsed")
     if uploaded_file is not None:
-        data = json.load(uploaded_file)
-        st.session_state.deck = data.get("Deck", {})
-        st.session_state.house_choice = data.get("House", "Stark")
-        st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
-        st.rerun()
+        try:
+            data = json.load(uploaded_file)
+            st.session_state.deck = data.get("Deck", {})
+            st.session_state.house_choice = data.get("House", "Stark")
+            st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
+            st.rerun()
+        except: st.error("Errore nel caricamento del file.")
