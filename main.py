@@ -43,12 +43,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. SESSION STATE ---
-if 'deck' not in st.session_state: st.session_state.deck = {}
+if 'deck' not in st.session_state: st.session_state.deck = {} # Chiave: ID della carta, Valore: Qty
 if 'house_choice' not in st.session_state: st.session_state.house_choice = "Stark"
 if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Nessuna Agenda"
 
 def reset_filters():
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         if key.startswith(('f_', 'a_', 'o_', 'v_', 'cr_')):
             del st.session_state[key]
 
@@ -58,6 +58,7 @@ def load_data():
     try:
         with open('agot1.json', 'r', encoding='utf-8') as f:
             df = pd.DataFrame(json.load(f))
+        df['id_str'] = df['id'].astype(str).str.strip() # ID normalizzato per il mazzo
         df['house_str'] = df['house'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else "Neutral")
         for col in ['cost', 'strength', 'income', 'influence']:
             df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0).astype(int)
@@ -93,8 +94,7 @@ CREST_ICONS = {
 # --- 5. SIDEBAR FILTRI ---
 st.sidebar.title("🔍 FILTRI")
 if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True, type="secondary"):
-    reset_filters()
-    st.rerun()
+    reset_filters(); st.rerun()
 
 if not df.empty:
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
@@ -104,6 +104,7 @@ if not df.empty:
         f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()), key="f_house")
         f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()), key="f_type")
 
+    # (Filtri numerici, icone e creste rimangono identici per funzionalità)
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter(label, key):
             st.write(f"**{label}**")
@@ -117,13 +118,11 @@ if not df.empty:
         with cr: a_str, o_str, v_str = num_filter("Forza", "s"); a_inf, o_inf, v_inf = num_filter("Influ.", "f")
 
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=True):
-        st.write("**Icone**")
         i_cols = st.columns(3)
         with i_cols[0]: f_mil = st.checkbox("MIL", key="f_mil"); st.markdown(SVG_MIL, unsafe_allow_html=True)
         with i_cols[1]: f_int = st.checkbox("INT", key="f_int"); st.markdown(SVG_INT, unsafe_allow_html=True)
         with i_cols[2]: f_pow = st.checkbox("POW", key="f_pow"); st.markdown(SVG_POW, unsafe_allow_html=True)
         st.write("---")
-        st.write("**Creste**")
         sel_crests = []
         c_cols = st.columns(2)
         for idx, c_name in enumerate(available_crests):
@@ -177,8 +176,8 @@ with c_list:
     with st.container(height=850):
         for i, row in filtered.head(100).iterrows():
             btn_col = render_card_row(row, "list")
-            if btn_col.button("➕", key=f"add_{row['id']}"):
-                st.session_state.deck[row['name']] = st.session_state.deck.get(row['name'], 0) + 1
+            if btn_col.button("➕", key=f"add_{row['id_str']}"):
+                st.session_state.deck[row['id_str']] = st.session_state.deck.get(row['id_str'], 0) + 1
                 st.rerun()
             st.markdown('<hr>', unsafe_allow_html=True)
 
@@ -186,8 +185,7 @@ with c_deck:
     d_header = st.columns([0.7, 0.3])
     d_header[0].subheader("📜 Deck")
     if d_header[1].button("🗑️ SVUOTA", use_container_width=True):
-        st.session_state.deck = {}
-        st.rerun()
+        st.session_state.deck = {}; st.rerun()
 
     col_h, col_a = st.columns(2)
     with col_h: 
@@ -199,22 +197,25 @@ with c_deck:
     
     m_count, p_count, deck_cards = 0, 0, []
     with st.container(height=500):
-        for name, qty in st.session_state.deck.items():
-            matches = df[df['name'] == name]
+        for cid, qty in st.session_state.deck.items():
+            matches = df[df['id_str'] == cid]
             if not matches.empty:
-                c_data = matches.iloc[0].to_dict()
-                c_data['qty'] = qty
-                deck_cards.append(c_data)
+                c_data = matches.iloc[0].to_dict(); c_data['qty'] = qty; deck_cards.append(c_data)
+
         categories = {"PLOT": "Plot", "PERSONAGGI UNICI": "Character_U", "PERSONAGGI NON UNICI": "Character_NU", "LUOGHI": "Location", "ATTACHMENT": "Attachment", "EVENTI": "Event"}
         for label, c_type in categories.items():
-            subset = [c for c in deck_cards if c['card_type'] == 'Character' and (c['is_unique'] if c_type=="Character_U" else not c['is_unique'])] if "Character" in c_type else [c for c in deck_cards if c['card_type'] == c_type]
+            if "Character" in c_type:
+                subset = [c for c in deck_cards if c['card_type'] == 'Character' and (c['is_unique'] if c_type=="Character_U" else not c['is_unique'])]
+            else:
+                subset = [c for c in deck_cards if c['card_type'] == c_type]
+            
             if subset:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
                 for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
                     btn_col = render_card_row(row, "deck")
-                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['name']}"):
-                        if row['qty'] > 1: st.session_state.deck[row['name']] -= 1
-                        else: del st.session_state.deck[row['name']]
+                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['id_str']}"):
+                        if row['qty'] > 1: st.session_state.deck[row['id_str']] -= 1
+                        else: del st.session_state.deck[row['id_str']]
                         st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
@@ -225,25 +226,40 @@ with c_deck:
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
     s2.metric("Plots", f"{p_count}/7")
     
-    if deck_cards:
-        st.write("📊 **Curve del Costo**")
-        col_curve = st.columns(2)
-        for i, ct in enumerate(['Character', 'Location']):
-            counts = {j: 0 for j in range(6)}
-            for c in [d for d in deck_cards if d['card_type'] == ct]: counts[min(c['cost'], 5)] += c['qty']
-            col_curve[i].caption(ct)
-            col_curve[i].bar_chart(pd.Series(counts), height=120)
-
-    # --- 8. IMPORT / EXPORT ---
+    # --- 8. IMPORT / EXPORT (SISTEMA TXT) ---
     st.divider()
     exp_col1, exp_col2 = st.columns(2)
-    export_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck})
-    exp_col1.download_button("💾 SALVA JSON", export_json, "mazzo.json", use_container_width=True)
     
-    uploaded_file = exp_col2.file_uploader("📂 CARICA JSON", type="json", label_visibility="collapsed")
+    # Costruzione file TXT
+    # Formato: 
+    # HOUSE: [Casata]
+    # AGENDA: [Agenda]
+    # ID | QTY | NAME
+    txt_content = f"HOUSE: {st.session_state.house_choice}\nAGENDA: {st.session_state.agenda_choice}\n"
+    txt_content += "-"*30 + "\n"
+    for cid, qty in st.session_state.deck.items():
+        c_name = df[df['id_str'] == cid]['name'].values[0]
+        txt_content += f"{cid} | {qty} | {c_name}\n"
+    
+    exp_col1.download_button("💾 SALVA TXT", txt_content, "mazzo.txt", use_container_width=True)
+    
+    uploaded_file = exp_col2.file_uploader("📂 CARICA TXT", type="txt", label_visibility="collapsed")
     if uploaded_file is not None:
-        data = json.load(uploaded_file)
-        st.session_state.deck = data.get("Deck", {})
-        st.session_state.house_choice = data.get("House", "Stark")
-        st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
-        st.rerun()
+        try:
+            new_deck = {}
+            lines = uploaded_file.getvalue().decode("utf-8").splitlines()
+            for line in lines:
+                if line.startswith("HOUSE:"): st.session_state.house_choice = line.replace("HOUSE:", "").strip()
+                elif line.startswith("AGENDA:"): st.session_state.agenda_choice = line.replace("AGENDA:", "").strip()
+                elif "|" in line:
+                    parts = line.split("|")
+                    if len(parts) >= 2:
+                        card_id = parts[0].strip()
+                        card_qty = int(parts[1].strip())
+                        # Verifica che l'ID esista nel database corrente
+                        if card_id in df['id_str'].values:
+                            new_deck[card_id] = card_qty
+            st.session_state.deck = new_deck
+            st.rerun()
+        except Exception as e:
+            st.error(f"Errore nel caricamento del file TXT: {e}")
