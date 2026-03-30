@@ -9,14 +9,10 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { min-width: 350px; z-index: 1; }
     .stMarkdown, p, label { font-size: 14px !important; }
-    
     .stButton>button { border-radius: 4px; }
 
-    /* COMPATTEZZA SELETTIVA SOLO PER LA COLONNA DECK (Destra) */
-    [data-testid="column"]:nth-child(2) .stElementContainer {
-        margin-bottom: -0.85rem !important;
-    }
-    
+    /* COMPATTEZZA SELETTIVA COLONNA DECK */
+    [data-testid="column"]:nth-child(2) .stElementContainer { margin-bottom: -0.85rem !important; }
     [data-testid="column"]:nth-child(2) .stButton>button {
         padding: 0px 2px !important;
         min-height: 22px !important;
@@ -25,16 +21,9 @@ st.markdown("""
     }
 
     .deck-section-header {
-        background-color: #1e1e1e;
-        padding: 2px 10px;
-        border-radius: 4px;
-        color: #FFD700;
-        font-weight: bold;
-        margin-top: 10px;
-        margin-bottom: 2px;
-        border-left: 3px solid #FFD700;
-        text-transform: uppercase;
-        font-size: 11px;
+        background-color: #1e1e1e; padding: 2px 10px; border-radius: 4px;
+        color: #FFD700; font-weight: bold; margin-top: 10px; margin-bottom: 2px;
+        border-left: 3px solid #FFD700; text-transform: uppercase; font-size: 11px;
     }
 
     .svg-container { display: flex; align-items: center; justify-content: center; position: relative; }
@@ -58,6 +47,11 @@ if 'deck' not in st.session_state: st.session_state.deck = {}
 if 'house_choice' not in st.session_state: st.session_state.house_choice = "Stark"
 if 'agenda_choice' not in st.session_state: st.session_state.agenda_choice = "Nessuna Agenda"
 
+def reset_filters():
+    for key in st.session_state.keys():
+        if key.startswith(('f_', 'a_', 'o_', 'v_', 'cr_')):
+            del st.session_state[key]
+
 # --- 3. CARICAMENTO DATI ---
 @st.cache_data
 def load_data():
@@ -71,15 +65,12 @@ def load_data():
         df['crest_list'] = df['crest'].apply(lambda x: x if isinstance(x, list) else [])
         df['traits_str'] = df['traits'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "").str.lower()
         df['is_unique'] = df['name'].str.contains(r'^\*') | df.get('unique', False)
-        
         all_crests = set()
         for sublist in df['crest_list']:
             for c in sublist:
                 if c: all_crests.add(c)
         return df, sorted(list(all_crests))
-    except Exception as e:
-        st.error(f"Errore caricamento dati: {e}")
-        return pd.DataFrame(), []
+    except: return pd.DataFrame(), []
 
 df, available_crests = load_data()
 
@@ -101,18 +92,23 @@ CREST_ICONS = {
 
 # --- 5. SIDEBAR FILTRI ---
 st.sidebar.title("🔍 FILTRI")
+if st.sidebar.button("🧹 RESET FILTRI", use_container_width=True, type="secondary"):
+    reset_filters()
+    st.rerun()
+
 if not df.empty:
     with st.sidebar.expander("🆔 NOME E TIPO", expanded=True):
-        f_name = st.text_input("Nome...")
-        f_text = st.text_input("Testo...")
-        f_trait = st.text_input("Tratto...")
-        f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()))
-        f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()))
+        f_name = st.text_input("Nome...", key="f_name")
+        f_text = st.text_input("Testo...", key="f_text")
+        f_trait = st.text_input("Tratto...", key="f_trait")
+        f_house = st.selectbox("Casata", ["Tutte"] + sorted(df['house_str'].unique().tolist()), key="f_house")
+        f_type = st.selectbox("Tipo Carta", ["Tutti"] + sorted(df['card_type'].unique().tolist()), key="f_type")
 
     with st.sidebar.expander("📊 VALORI NUMERICI", expanded=False):
         def num_filter(label, key):
             st.write(f"**{label}**")
-            c = st.columns([0.2, 0.4, 0.4]); active = c[0].checkbox("", key=f"a_{key}")
+            c = st.columns([0.2, 0.4, 0.4])
+            active = c[0].checkbox("", key=f"a_{key}")
             op = c[1].selectbox("Op", ["=", ">", "<", ">=", "<="], key=f"o_{key}", label_visibility="collapsed")
             val = c[2].number_input("Val", 0, 15, key=f"v_{key}", label_visibility="collapsed")
             return active, op, val
@@ -123,9 +119,9 @@ if not df.empty:
     with st.sidebar.expander("⚔️ ICONE E CRESTE", expanded=True):
         st.write("**Icone**")
         i_cols = st.columns(3)
-        with i_cols[0]: f_mil = st.checkbox("MIL"); st.markdown(SVG_MIL, unsafe_allow_html=True)
-        with i_cols[1]: f_int = st.checkbox("INT"); st.markdown(SVG_INT, unsafe_allow_html=True)
-        with i_cols[2]: f_pow = st.checkbox("POW"); st.markdown(SVG_POW, unsafe_allow_html=True)
+        with i_cols[0]: f_mil = st.checkbox("MIL", key="f_mil"); st.markdown(SVG_MIL, unsafe_allow_html=True)
+        with i_cols[1]: f_int = st.checkbox("INT", key="f_int"); st.markdown(SVG_INT, unsafe_allow_html=True)
+        with i_cols[2]: f_pow = st.checkbox("POW", key="f_pow"); st.markdown(SVG_POW, unsafe_allow_html=True)
         st.write("---")
         st.write("**Creste**")
         sel_crests = []
@@ -154,26 +150,22 @@ if not df.empty:
     if f_pow: filtered = filtered[filtered['icons_list'].apply(lambda x: "Power" in x)]
     for c in sel_crests: filtered = filtered[filtered['crest_list'].apply(lambda x: c in x)]
 
-# --- 6. FUNZIONE RENDER RIGA ---
+# --- 6. FUNZIONI RENDERING ---
 def render_card_row(row, key_prefix):
     cols = st.columns([0.13, 0.42, 0.09, 0.24, 0.12])
     with cols[0]:
         if row['card_type'] not in ['House', 'Agenda', 'Plot']:
             st.markdown(f'<div class="svg-container">{SVG_COIN}<span class="svg-text" style="color:black; top:4px; font-size:13px;">{row["cost"]}</span></div>', unsafe_allow_html=True)
-        elif row['card_type'] == 'Plot':
-            st.write(f"({row['income']})")
+        elif row['card_type'] == 'Plot': st.write(f"({row['income']})")
     with cols[1]:
-        img_hover_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
-        hover_html = f'<div class="card-hover-container"><span class="card-name-text">{row["name"]}</span><img class="card-hover-image" src="{img_hover_url}" width="300"></div>'
-        st.markdown(hover_html, unsafe_allow_html=True)
+        img_url = f"https://agot-lcg-search.pages.dev{row['preview_image_url']}"
+        st.markdown(f'<div class="card-hover-container"><span class="card-name-text">{row["name"]}</span><img class="card-hover-image" src="{img_url}" width="300"></div>', unsafe_allow_html=True)
     with cols[2]:
-        if row['card_type'] == 'Character':
-            st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
+        if row['card_type'] == 'Character': st.markdown(f'<div class="svg-container">{SVG_SHIELD}<span class="svg-text" style="color:white; top:6px; font-size:13px;">{row["strength"]}</span></div>', unsafe_allow_html=True)
     with cols[3]:
         ic_html = f"""<div style="display:flex; align-items:center;"><div style="display:flex; gap:2px; width:65px;"><div style="width:19px; height:19px;">{SVG_MIL if "Military" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_INT if "Intrigue" in row["icons_list"] else ""}</div><div style="width:19px; height:19px;">{SVG_POW if "Power" in row["icons_list"] else ""}</div></div><div style="display:flex; gap:3px; margin-left:12px; border-left: 1px solid rgba(255,255,255,0.15); padding-left:8px;">"""
         for cr in row['crest_list']: ic_html += f'<div style="width:19px; height:19px;">{CREST_ICONS.get(cr, "")}</div>'
-        ic_html += '</div></div>'
-        st.markdown(ic_html, unsafe_allow_html=True)
+        st.markdown(ic_html + '</div></div>', unsafe_allow_html=True)
     return cols[4]
 
 # --- 7. LAYOUT PRINCIPALE ---
@@ -191,7 +183,12 @@ with c_list:
             st.markdown('<hr>', unsafe_allow_html=True)
 
 with c_deck:
-    st.subheader("📜 Deck")
+    d_header = st.columns([0.7, 0.3])
+    d_header[0].subheader("📜 Deck")
+    if d_header[1].button("🗑️ SVUOTA", use_container_width=True):
+        st.session_state.deck = {}
+        st.rerun()
+
     col_h, col_a = st.columns(2)
     with col_h: 
         houses = sorted(df[df['card_type'] == 'House']['name'].unique().tolist())
@@ -200,39 +197,29 @@ with c_deck:
         agendas = ["Nessuna Agenda"] + sorted(df[df['card_type'] == 'Agenda']['name'].unique().tolist())
         st.session_state.agenda_choice = st.selectbox("Agenda", agendas, index=agendas.index(st.session_state.agenda_choice) if st.session_state.agenda_choice in agendas else 0)
     
-    m_count, p_count = 0, 0
-    deck_cards = []
-    
-    with st.container(height=550):
+    m_count, p_count, deck_cards = 0, 0, []
+    with st.container(height=500):
         for name, qty in st.session_state.deck.items():
             matches = df[df['name'] == name]
             if not matches.empty:
                 c_data = matches.iloc[0].to_dict()
                 c_data['qty'] = qty
                 deck_cards.append(c_data)
-        
         categories = {"PLOT": "Plot", "PERSONAGGI UNICI": "Character_U", "PERSONAGGI NON UNICI": "Character_NU", "LUOGHI": "Location", "ATTACHMENT": "Attachment", "EVENTI": "Event"}
-        
         for label, c_type in categories.items():
-            subset = []
-            if c_type == "Character_U": subset = [c for c in deck_cards if c['card_type'] == 'Character' and c['is_unique']]
-            elif c_type == "Character_NU": subset = [c for c in deck_cards if c['card_type'] == 'Character' and not c['is_unique']]
-            else: subset = [c for c in deck_cards if c['card_type'] == c_type]
-            
+            subset = [c for c in deck_cards if c['card_type'] == 'Character' and (c['is_unique'] if c_type=="Character_U" else not c['is_unique'])] if "Character" in c_type else [c for c in deck_cards if c['card_type'] == c_type]
             if subset:
                 st.markdown(f'<div class="deck-section-header">{label} ({sum(c["qty"] for c in subset)})</div>', unsafe_allow_html=True)
                 for row in sorted(subset, key=lambda x: x['cost'], reverse=True):
                     btn_col = render_card_row(row, "deck")
-                    with btn_col:
-                        if st.button(f"x{row['qty']}", key=f"rm_{row['name']}"):
-                            if row['qty'] > 1: st.session_state.deck[row['name']] -= 1
-                            else: del st.session_state.deck[row['name']]
-                            st.rerun()
+                    if btn_col.button(f"x{row['qty']}", key=f"rm_{row['name']}"):
+                        if row['qty'] > 1: st.session_state.deck[row['name']] -= 1
+                        else: del st.session_state.deck[row['name']]
+                        st.rerun()
                     if row['card_type'] == 'Plot': p_count += row['qty']
                     else: m_count += row['qty']
                     st.markdown('<hr>', unsafe_allow_html=True)
 
-    # --- 8. STATISTICHE ---
     st.divider()
     s1, s2 = st.columns(2)
     s1.metric("Mazzo (Draw)", f"{m_count}/60")
@@ -240,22 +227,23 @@ with c_deck:
     
     if deck_cards:
         st.write("📊 **Curve del Costo**")
-        col_curve1, col_curve2 = st.columns(2)
-        
-        def get_curve(ctype):
-            data = [c for c in deck_cards if c['card_type'] == ctype]
-            counts = {i: 0 for i in range(6)} # 0 to 5+
-            for c in data:
-                cost = min(c['cost'], 5)
-                counts[cost] += c['qty']
-            return pd.Series(counts)
+        col_curve = st.columns(2)
+        for i, ct in enumerate(['Character', 'Location']):
+            counts = {j: 0 for j in range(6)}
+            for c in [d for d in deck_cards if d['card_type'] == ct]: counts[min(c['cost'], 5)] += c['qty']
+            col_curve[i].caption(ct)
+            col_curve[i].bar_chart(pd.Series(counts), height=120)
 
-        with col_curve1:
-            st.caption("Personaggi")
-            st.bar_chart(get_curve('Character'), height=150)
-        with col_curve2:
-            st.caption("Luoghi")
-            st.bar_chart(get_curve('Location'), height=150)
-
-    export_data = {"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck}
-    st.download_button("💾 SALVA JSON", json.dumps(export_data), "mazzo.json", use_container_width=True)
+    # --- 8. IMPORT / EXPORT ---
+    st.divider()
+    exp_col1, exp_col2 = st.columns(2)
+    export_json = json.dumps({"House": st.session_state.house_choice, "Agenda": st.session_state.agenda_choice, "Deck": st.session_state.deck})
+    exp_col1.download_button("💾 SALVA JSON", export_json, "mazzo.json", use_container_width=True)
+    
+    uploaded_file = exp_col2.file_uploader("📂 CARICA JSON", type="json", label_visibility="collapsed")
+    if uploaded_file is not None:
+        data = json.load(uploaded_file)
+        st.session_state.deck = data.get("Deck", {})
+        st.session_state.house_choice = data.get("House", "Stark")
+        st.session_state.agenda_choice = data.get("Agenda", "Nessuna Agenda")
+        st.rerun()
